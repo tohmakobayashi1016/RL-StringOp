@@ -1,6 +1,12 @@
 import os, compas
 from time import time
 from math import pi, cos, sin
+from collections import Counter, namedtuple, deque
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
 
 from compas_quad.datastructures import CoarsePseudoQuadMesh
 from compas_quad.grammar.addition2 import add_strip_lizard
@@ -33,3 +39,9 @@ if view:
 
 viewer.show()
 
+
+
+
+
+
+print(9)

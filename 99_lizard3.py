@@ -71,7 +71,7 @@ output_mesh_refinement = 1  # densify the ouput quad mesh
 
 # for 'given' production
 add_given_strings = True
-given_strings = "atpta"
+given_strings = ""
 
 class StringVectorConverter:
     def from_string_to_vector(self, string):
@@ -203,7 +203,7 @@ for k, string in enumerate(strings):
     if export_json:
         HERE = os.path.dirname(__file__)
         FILE = os.path.join(HERE, 'data/{}_{}.json'.format(input_mesh_refinement, string))
-        mesh.to_json('C:/Users/footb/Desktop/Thesis/Github Repo/Output/06/{}.json'.format(string))
+        mesh.to_json('C:/Users/footb/Desktop/Thesis/String-RL/Output/06/{}.json'.format(string))
 
     # geometry and density processing
     if postprocess:
