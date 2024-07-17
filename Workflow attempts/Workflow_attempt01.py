@@ -38,10 +38,3 @@ if view:
     viewer.scene.add(mesh0)
 
 viewer.show()
-
-
-
-
-
-
-print(9)

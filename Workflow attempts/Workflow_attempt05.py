@@ -1,28 +1,19 @@
 import os
-import compas
 from time import time
 from math import pi, cos, sin
-from collections import Counter
-
-
 from compas_quad.datastructures import CoarsePseudoQuadMesh
 from compas_quad.grammar.addition2 import add_strip_lizard
-from compas_quad.grammar.lizard import string_generation_brute, string_generation_random, string_generation_structured, string_generation_evolution, Lizard
+from compas_quad.grammar.lizard import string_generation_brute, string_generation_random, string_generation_structured, string_generation_evolution
 from compas_fd.solvers import fd_numpy
 from compas_viewer.viewer import Viewer
+from Classes.string_to_vector import StringVectorConverter
+from Classes.feature_extraction import MeshFeature
 
 # custom postprocessing function
 def postprocessing(mesh):
 
     key2index = {vkey: i for i, vkey in enumerate(mesh.vertices())}
     index2key = {i: vkey for i, vkey in enumerate(mesh.vertices())}
-
-    #print("Vertex Key to Index Mapping:")
-    #for vkey, index in key2index.items():
-        #print(f"Vertex Key: {vkey}, Index: {index}")
-    #print("\nIndex to Vertex Key Mapping:")
-    #for index, vkey in index2key.items():
-        #print(f"Index: {index}, Vertex Key: {vkey}")
 
     # map mesh boundary vertices to circle
     fixed = mesh.vertices_on_boundary()[:-1]
@@ -48,22 +39,6 @@ def postprocessing(mesh):
         attr['y'] = y
         attr['z'] = z
 
-    #print("\nUpdated Vertex Coordinates:")
-    #for vkey in mesh.vertices():
-        #attr = mesh.vertex[vkey]
-        #print(f"Vertex Key: {vkey}, Coordinates: ({attr['x']}, {attr['y']}, {attr['z']})")
-
-    vertex_degrees = [mesh.vertex_degree(vkey) for vkey in mesh.vertices()]
-    degree_distribution = Counter(vertex_degrees)
-    print("Vertex Degree Distribution:", degree_distribution)
-    face_valences = [len(mesh.face_vertices(fkey)) for fkey in mesh.faces()]
-    valence_distribution = Counter(face_valences)
-    print("Face Valence Distribution:", valence_distribution)
-    
-
-
-
-
 ### parameters ###
 
 input_mesh_refinement = 2  # densify the input 1-face quad mesh
@@ -71,34 +46,17 @@ output_mesh_refinement = 1  # densify the ouput quad mesh
 
 # for 'given' production
 add_given_strings = True
-given_strings = ""
-
-class StringVectorConverter:
-    def from_string_to_vector(self, string):
-        vector = []
-        for k in string:
-            if k == 't':
-                vector.append("00")
-            elif k == 'p':
-                vector.append("01")
-            elif k == 'a':
-                vector.append("10")
-            elif k == 'd':
-                vector.append("11")
-        # Join the elements of the vector into a single string and return it as a list with one item
-        return [''.join(vector)]
+given_strings = ["a", "at", "ata"]
 
 # Create an instance of the class
 converter = StringVectorConverter()
 
 # Call the method with a string
-string_to_vector = converter.from_string_to_vector(given_strings)
+strings = []
+for s in given_strings:
+    strings.append(converter.from_string_to_vector(s))
 
-# Print the result
-print(f"Input string: {given_strings}")
-print(f"Output list: {string_to_vector}")
-
-
+print(strings)
 
 # for 'brute' force enumeration
 add_brute_strings = False
@@ -109,7 +67,7 @@ brute_string_length = 8
 add_random_strings = False
 random_string_characters = '01'
 random_string_number = 50
-random_string_length = 50
+random_string_length = 20
 random_string_ratios = [0.5, 0.5]
 
 # for 'structured' construction
@@ -121,14 +79,14 @@ structured_string_length = 5
 # random evolution
 add_evolution_strings = False
 evolution_string_characters = '01'
-evolution_string_number = 50
+evolution_string_number = 100
 evolution_string_length = 20
 
 postprocess = True
 densify = True
 array = True
 view = True
-export_json = True
+export_json = False
 
 ### intialise ###
 
@@ -160,9 +118,9 @@ lizard = (tail, body, head)
 print('lizard initial position', lizard)
 
 # produce strings
-strings = []
-if add_given_strings:
-    strings += string_to_vector
+#strings = []
+#if add_given_strings:
+#    strings += given_strings
 if add_brute_strings:
     strings += list(string_generation_brute(brute_string_characters, brute_string_length))
 if add_random_strings:
@@ -176,6 +134,8 @@ print('{} strings: {}'.format(len(strings), strings))
 # apply
 t0 = time()
 mesh2string = {}
+categorized_vertices_all_meshes = {}
+
 for k, string in enumerate(strings):
     print(string)
 
@@ -216,11 +176,22 @@ for k, string in enumerate(strings):
             mesh = mesh.dense_mesh()
             postprocessing(mesh)
 
+    # categorize vertices 
+    try:
+        mesh_features = MeshFeature(mesh)
+        categorized_vertices = mesh_features.categorize_vertices()
+        categorized_vertices_all_meshes[string] = categorized_vertices
+    except TypeError as e:
+        print(f"Error in categorizing vertices for mesh {string}: {e}")
+
     mesh2string[mesh] = string
 
 # results
 t1 = time()
 print('computation time {}s for {} meshes'.format(round(t1 - t0, 3), len(mesh2string)))
+
+for string, categorized_vertices in categorized_vertices_all_meshes.items():
+    print(f"Categorized vertices for mesh {string}: {categorized_vertices}")
 
 if array:
     n = len(mesh2string)
@@ -236,4 +207,3 @@ if view:
         viewer.scene.add(mesh)
     viewer.show()
 
-print(mesh2string)
