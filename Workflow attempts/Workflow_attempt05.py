@@ -1,4 +1,5 @@
 import os
+import sys
 from time import time
 from math import pi, cos, sin
 from compas_quad.datastructures import CoarsePseudoQuadMesh
@@ -6,8 +7,10 @@ from compas_quad.grammar.addition2 import add_strip_lizard
 from compas_quad.grammar.lizard import string_generation_brute, string_generation_random, string_generation_structured, string_generation_evolution
 from compas_fd.solvers import fd_numpy
 from compas_viewer.viewer import Viewer
-from Classes.string_to_vector import StringVectorConverter
-from Classes.feature_extraction import MeshFeature
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Classes')))
+from string_to_vector import StringVectorConverter
+from feature_extraction import MeshFeature
 
 # custom postprocessing function
 def postprocessing(mesh):

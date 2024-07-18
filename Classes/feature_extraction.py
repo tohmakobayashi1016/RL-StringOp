@@ -40,7 +40,7 @@ class MeshFeature:
         }
         return features
 
-    def categorize_vertices(self, display_vertices=True):
+    def categorize_vertices(self, display_vertices=False):
         boundary_vertices = set(self.mesh.vertices_on_boundary())
         inside_vertices = set(self.mesh.vertices()) - boundary_vertices
 

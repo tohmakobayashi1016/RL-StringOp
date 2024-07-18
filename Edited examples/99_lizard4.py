@@ -107,7 +107,7 @@ for k, string in enumerate(strings):
                 poles.append(mesh.vertex_coordinates(body))
             else:
                 # warn if pole missing
-                'pbm identification p   ole'
+                'pbm identification pole'
                 poles.append(mesh.vertex_coordinates(fv[0]))
     
     # warn if mesh not manifold

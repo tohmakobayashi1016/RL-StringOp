@@ -13,16 +13,26 @@ from feature_extraction import MeshFeature
 class MeshEnvironment(gym.Env):
     def __init__(self, initial_mesh, terminal_mesh_json_path, max_steps=100):
         super(MeshEnvironment, self).__init__()
+
+        #Initialize mesh and terminal state
         self.initial_mesh = initial_mesh
         self.terminal_mesh = self.load_terminal_mesh_from_json(terminal_mesh_json_path)
+
         self.current_mesh = CoarsePseudoQuadMesh.from_vertices_and_faces(*initial_mesh.to_vertices_and_faces())
+        
+        #Define action space
         self.actions = ['a', 't', 'p']
-        self.lizard = self.find_lizard(self.current_mesh)
-        self.max_steps = max_steps
-        self.current_step = 0
+        self.action_string = ''
         self.action_space = spaces.Discrete(len(self.actions))
+
+        #Define observation space 
         self.vertices_list = list(self.current_mesh.vertices())
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(len(self.vertices_list)* 3,), dtype=np.float32)
+
+        self.lizard = self.find_lizard(self.current_mesh)
+        self.max_steps = max_steps
+        self.current_step = 0   
+        
         print("Environment initialized.")
 
     def load_terminal_mesh_from_json(self, json_path):
@@ -43,15 +53,39 @@ class MeshEnvironment(gym.Env):
         super().reset(seed=seed)
         self.current_mesh = CoarsePseudoQuadMesh.from_vertices_and_faces(*self.initial_mesh.to_vertices_and_faces())
         self.lizard = self.find_lizard(self.current_mesh)
+        self.action_string = ''
         self.current_step = 0
         print("Environment reset.")
         obs = self.get_state().flatten().astype(np.float32)
-        return obs, {}  
+        return (obs, {}) if return_info else (obs, {})
     
     def step(self, action):
-        action_str = self.actions[action]
+        self.current_step += 1
+        self.action_string += self.actions[action]
         tail, body, head = self.lizard
-        lizard_atp(self.current_mesh, (tail, body, head), action_str)
+        self.current_mesh = CoarsePseudoQuadMesh.from_vertices_and_faces(*self.initial_mesh.to_vertices_and_faces())
+
+        lizard_atp(self.current_mesh, (tail, body, head), self.action_string)
+
+        
+
+        poles = []
+        for fkey in self.current_mesh.faces():
+            fv = self.current_mesh.face_vertices(fkey)
+            if len(fv) == 3:
+                if body in fv:
+                    poles.append(self.current_mesh.vertex_coordinates(body))
+                else:
+                    'pbm identification pole'
+                    poles.append(self.current_mesh.vertex_coordinates(fv[0]))
+        
+        if not self.current_mesh.is_manifold():
+            print('Mesh not manifold. Terminating episode.')
+            reward = -1.0
+            terminated = True
+            truncated = True
+            return self.get_state().flatten().astype(np.float32), reward, terminated, truncated, {}
+
 
         self.current_step += 1
 
