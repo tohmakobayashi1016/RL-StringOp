@@ -2,7 +2,7 @@ from stable_baselines3 import DQN
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold, BaseCallback
 from compas_quad.datastructures import CoarsePseudoQuadMesh
-from Environment_attempt03 import MeshEnvironment
+from Environment_attempt04 import MeshEnvironment
 from compas_viewer import Viewer
 
 import sys, os
@@ -77,7 +77,7 @@ Logging_callback = LoggingCallback(log_file)
 #eval_callback = EvalCallback(env, callback_on_new_best=callback_on_best, eval_freq=1000, verbose=1)
 
 # Train the model
-model.learn(total_timesteps=1000, callback=Logging_callback)
+model.learn(total_timesteps=10, callback=Logging_callback)
 
 # Save the model
 model.save("dqn_mesh")

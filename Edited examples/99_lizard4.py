@@ -1,4 +1,4 @@
-import os
+import os, sys
 from time import time
 from math import pi, cos, sin
 from compas.datastructures import Mesh
@@ -7,6 +7,7 @@ from compas_quad.grammar.addition2 import add_strip_lizard, add_strip_lizard_2, 
 from compas_quad.grammar.lizard import string_generation_brute, string_generation_random, string_generation_structured, string_generation_evolution
 from compas_fd.solvers import fd_numpy
 from compas_viewer.viewer import Viewer
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Classes')))
 from feature_extraction import MeshFeature
 
 
@@ -42,8 +43,8 @@ def postprocessing(mesh):
 
 ### parameters ###
 
-input_mesh_refinement = 1  # densify the input 1-face quad mesh
-output_mesh_refinement = 3  # densify the ouput quad mesh
+input_mesh_refinement = 2  # densify the input 1-face quad mesh
+output_mesh_refinement = 1  # densify the ouput quad mesh
 
 postprocess = True
 densify = True

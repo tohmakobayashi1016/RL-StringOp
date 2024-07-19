@@ -40,7 +40,7 @@ class MeshFeature:
         }
         return features
 
-    def categorize_vertices(self, display_vertices=False):
+    def categorize_vertices(self, display_vertices=True):
         boundary_vertices = set(self.mesh.vertices_on_boundary())
         inside_vertices = set(self.mesh.vertices()) - boundary_vertices
 
@@ -87,6 +87,7 @@ class MeshFeature:
                 print(f"Degree {degree}: Count = {info['count']}")
 
         return result
+          
 
        
     

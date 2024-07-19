@@ -15,7 +15,7 @@ from FormatConverter import FormatConverter
 from PostProcessor import PostProcessor
 
 class MeshEnvironment(gym.Env):
-    def __init__(self, initial_mesh, terminal_mesh_json_path, max_steps=100):
+    def __init__(self, initial_mesh, terminal_mesh_json_path, max_steps=50):
         super(MeshEnvironment, self).__init__()
 
         #Initialize mesh and terminal state
@@ -90,7 +90,8 @@ class MeshEnvironment(gym.Env):
         self.current_step = 0
         print("Environment reset.")
         obs = self.get_state().flatten().astype(np.float32)
-        return (obs, {}) if return_info else (obs, {})
+        info = {}
+        return (obs, info) if return_info else (obs, info)
     
     def step(self, action):
         self.current_step += 1
@@ -128,8 +129,9 @@ class MeshEnvironment(gym.Env):
         terminated = self.is_terminal_state()
         truncated = self.current_step >= self.max_steps
         reward = self.calculate_reward(terminated)
+        obs = self.get_state().flatten().astype(np.float32)
 
-        return self.get_state().flatten().astype(np.float32), reward, terminated, truncated, {}
+        return obs, reward, terminated, truncated, {}
     
     def calculate_reward(self, done):
         terminal_features = MeshFeature(self.terminal_mesh).categorize_vertices(display_vertices = False)
@@ -170,17 +172,6 @@ class MeshEnvironment(gym.Env):
         if done and self.is_terminal_state():
             print("Terminal state reached, adding large positive reward")
             reward += large_positive_reward
-        #for key in terminal_features:
-            #term_boundary = terminal_features[key].get('boundary_vertices_by_degree', {})
-            #curr_boundary = current_features[key].get('boundary_vertices_by_degree', {})
-            #term_internal = terminal_features[key].get('inside_vertices_by_degree', {})
-            #curr_internal = current_features[key].get('inside_vertices_by_degree', {})
-
-            # Calculate rewarrd based on similarity of vertex distributions
-            #for degree in term_boundary:
-                #reward -= abs(term_boundary.get(degree, {'count': 0})['count'] - curr_boundary.get(degree, {'count': 0})['count'])
-            #for degree in term_internal:
-                #reward -= abs(term_internal.get(degree, {'count': 0})['count'] - curr_internal.get(degree, {'count': 0})['count'])
 
         return reward
 
@@ -189,24 +180,22 @@ class MeshEnvironment(gym.Env):
         terminal_features = MeshFeature(self.terminal_mesh).categorize_vertices(display_vertices=False)
         current_features  = MeshFeature(self.current_mesh).categorize_vertices(display_vertices=False)
 
-        for key in terminal_features:
-            term_boundary = terminal_features[key].get('boundary_vertices_by_degree', {})
-            curr_boundary = current_features[key].get('boundary_vertices_by_degree', {})
-            term_internal = terminal_features[key].get('inside_vertices_by_degree', {})
-            curr_internal = current_features[key].get('inside_vertices_by_degree', {})
-
-            #Check if all vertex distribution match
-            for degree in term_boundary:
-                if term_boundary.get(degree, {'count': 0})['count'] != curr_boundary.get(degree, {'count': 0})['count']:
-                    print(f"Boundary degree {degree} does not match")
-                    return False
-            for degree in term_internal:
-                if term_internal.get(degree, {'count': 0})['count'] != curr_internal.get(degree, {'count': 0})['count']:
-                    print(f"Internal degree {degree} does not match")
-                    return False
+        for degree, info in terminal_features['boundary_vertices_by_degree'].items():
+            if degree not in current_features['boundary_vertices_by_degree'] or \
+            info ['count'] != current_features['boundary_vertices_by_degree'][degree]['count']:
+                print(f"Boundary degree {degree} does not match")
+                return False
+            
+        for degree, info in terminal_features['inside_vertices_by_degree'].items():
+            if degree not in current_features['inside_vertices_by_degree'] or \
+            info ['count'] != current_features['inside_vertices_by_degree'][degree]['count']:
+                print(f"Interior degree {degree} does not match")
+                return False
         print("Terminal state detected")
         return True
     
     def get_state(self):
+        self.post_processor.postprocess(self.current_mesh)
+
         vertices = np.array([self.current_mesh.vertex_coordinates(vkey) for vkey in self.current_mesh.vertices()])
         return vertices
