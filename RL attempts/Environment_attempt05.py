@@ -1,6 +1,6 @@
 import numpy as np 
 import gymnasium as gym
-from gymnasium import spaces
+from gymnasium.spaces import Graph, Box, Discrete
 import sys, os, json
 from math import pi, cos, sin
 
@@ -15,7 +15,7 @@ from FormatConverter import FormatConverter
 from PostProcessor import PostProcessor
 
 class MeshEnvironment(gym.Env):
-    def __init__(self, initial_mesh, terminal_mesh_json_path, max_steps=100):
+    def __init__(self, initial_mesh, terminal_mesh_json_path, max_steps=100, max_vertices=50):
         super(MeshEnvironment, self).__init__()
 
         #Initialize mesh and terminal state
@@ -29,11 +29,14 @@ class MeshEnvironment(gym.Env):
         #Define action space
         self.actions           = ['a', 't', 'p']
         self.action_string     = ''
-        self.action_space      = spaces.Discrete(len(self.actions))
+        self.action_space      = Discrete(len(self.actions))
 
         #Define observation space 
-        self.vertices_list     = list(self.current_mesh.vertices())
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(len(self.vertices_list)* 3,), dtype=np.float32)
+        self.max_vertices      = max_vertices
+        self.node_space        = Box(low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32)
+        self.edge_space        = Box(low=0, high=1, shape=(1,), dtype=np.float32)
+        
+        self.observation_space = Graph(node_space=self.node_space, edge_space=self.edge_space)
 
         self.lizard            = self.find_lizard(self.current_mesh)
         self.max_steps         = max_steps
@@ -90,7 +93,7 @@ class MeshEnvironment(gym.Env):
         self.action_string = ''
         self.current_step = 0
         print("Environment reset.")
-        obs = self.get_state().flatten().astype(np.float32)
+        obs = self.get_state()
         info = {}
         return (obs, info) if return_info else (obs, info)
     
@@ -124,7 +127,7 @@ class MeshEnvironment(gym.Env):
             reward = -1.0
             terminated = True
             truncated = True
-            return self.get_state().flatten().astype(np.float32), reward, terminated, truncated, {}
+            return self.get_state(), reward, terminated, truncated, {}
 
         #Post-process the mesh 
         self.post_processor.postprocess(self.current_mesh)
@@ -132,7 +135,7 @@ class MeshEnvironment(gym.Env):
         terminated = self.is_terminal_state()
         truncated = self.current_step >= self.max_steps or len(self.action_string) >= 20
         reward = self.calculate_reward(terminated)
-        obs = self.get_state().flatten().astype(np.float32)
+        obs = self.get_state()
 
         return obs, reward, terminated, truncated, {}
     
@@ -208,4 +211,28 @@ class MeshEnvironment(gym.Env):
     def get_state(self):
         self.post_processor.postprocess(self.current_mesh)
         vertices = np.array([self.current_mesh.vertex_coordinates(vkey) for vkey in self.current_mesh.vertices()])
-        return vertices
+        
+        if len(vertices) < self.max_vertices:
+            padding = np.zeros((self.max_vertices - len(vertices), 3))
+            vertices = np.vstack((vertices, padding))
+        vertices = vertices[:self.max_vertices]
+
+        edges = []
+        edge_attrs = []
+
+        for u, v in self.current_mesh.edges():
+            edges.append((u, v))
+            edges.append((v, u))
+            edge_attrs.append([1.0])
+            edge_attrs.append([1.0])
+        
+        edge_index = np.array(edges, dtype=np.int32)
+        edge_attr  = np.array(edge_attrs, dtype=np.float32)
+
+        if edge_index.shape[0] < self.max_vertices * 4:
+            padding = np.zeros((self.max_vertices * 4 - edge_index.shape[0], 2), dtype=np.int32)
+            edge_index = np.vstack((edge_index, padding))
+            padding_attr = np.zeros((self.max_vertices * 4 - edge_attr.shape[0], 1), dtype=np.float32)
+            edge_attr = np.vstack((edge_attr, padding_attr))
+        
+        return GraphInstance(nodes=vertices, edges=edge_attr, edge_links = edge_index)
