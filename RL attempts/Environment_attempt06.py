@@ -1,6 +1,6 @@
 import numpy as np 
 import gymnasium as gym
-from gymnasium.spaces import Graph, Box, Discrete
+from gymnasium.spaces import Box, Discrete, Dict
 import sys, os, json
 from math import pi, cos, sin
 
@@ -18,41 +18,49 @@ class MeshEnvironment(gym.Env):
     def __init__(self, initial_mesh, terminal_mesh_json_path, max_steps=100, max_vertices=50):
         super(MeshEnvironment, self).__init__()
 
+        #Initialize classes
+        self.format_converter  = FormatConverter()
+        self.post_processor    = PostProcessor()
+        
         #Initialize mesh and terminal state
         self.initial_mesh      = initial_mesh
-        self.terminal_mesh     = self.load_terminal_mesh_from_json(terminal_mesh_json_path)
+        self.terminal_mesh     = self.load_terminal_mesh(terminal_mesh_json_path)
+        self.terminal_features = MeshFeature(self.terminal_mesh).categorize_vertices(display_vertices=False)
 
-        #Separate initial mesh for modification and current meh for tracking state
+        #Separate initial mesh for modification and current mesh for tracking state
         self.initial_mesh_copy = CoarsePseudoQuadMesh.from_vertices_and_faces(*initial_mesh.to_vertices_and_faces())
         self.current_mesh      = CoarsePseudoQuadMesh.from_vertices_and_faces(*initial_mesh.to_vertices_and_faces())
 
         #Define action space
-        self.actions           = ['a', 't', 'p']
+        self.action_space      = Discrete(3)
         self.action_string     = ''
-        self.action_space      = Discrete(len(self.actions))
-
-        #Define observation space 
-        self.max_vertices      = max_vertices
-        self.node_space        = Box(low=-np.inf, high=np.inf, shape=(max_vertices, 3), dtype=np.float32)
-        self.edge_space        = Box(low=0, high=1, shape=(max_vertices * 4, 2), dtype=np.float32)
-        self.edge_attr_space   = Box(low=0, high=1, shape=(max_vertices * 4, 1), dtype=np.float32)
         
-        #self.observation_space = Graph(node_space=self.node_space, edge_space=self.edge_space)
-        observation_shape      = max_vertices * 3 + max_vertices * 4 * 2 + max_vertices * 4
-        self.observation_space = Box(low=-np.inf, high=np.inf, shape=(observation_shape,), dtype=np.float32)
+        # Define observation space using Dict
+        self.max_vertices = max_vertices
+        self.node_space = Box(low=-np.inf, high=np.inf, shape=(max_vertices, 3), dtype=np.float32)
+        self.edge_index_space = Box(low=0, high=max_vertices, shape=(max_vertices * 4, 2), dtype=np.int32)
+        self.edge_attr_space = Box(low=0, high=1, shape=(max_vertices * 4, 2), dtype=np.float32)
+        self.observation_space = Dict({
+            "vertices": self.node_space,
+            "edge_index": self.edge_index_space,
+            "edge_attr": self.edge_attr_space
+        })
 
-        self.lizard            = self.find_lizard(self.current_mesh)
+        #Initialize compas parameters
+        self.lizard            = self.position_lizard(self.initial_mesh_copy)
+        self.last_action       = None
+        self.a_count           = 0
+        self.copy_poles        = []
+        self.current_poles     = []
+
+        #Initialize model parameters
         self.max_steps         = max_steps
         self.current_step      = 0   
-
-        self.format_converter  = FormatConverter()
-        self.post_processor    = PostProcessor()
-
-        self.post_processor.postprocess(self.terminal_mesh)
-        
+        self.episode_number    = 0
+   
         print("Environment initialized.")
 
-    def load_terminal_mesh_from_json(self, json_path):
+    def load_terminal_mesh(self, json_path):
         print(f"Loading terminal mesh from {json_path}...")
         with open(json_path, 'r') as f:
             data = json.load(f)
@@ -60,6 +68,7 @@ class MeshEnvironment(gym.Env):
             raise ValueError("Incorrect JSON format")
         
         mesh = Mesh()
+        #self.post_processor.postprocess(mesh)
         vertices = data['data']['vertex']
         faces = data['data']['face']
 
@@ -79,116 +88,88 @@ class MeshEnvironment(gym.Env):
         
         return mesh
     
-    def find_lizard(self, mesh):
+    def position_lizard(self, mesh):
         for vkey in mesh.vertices_on_boundary():
             if mesh.vertex_degree(vkey) == 2:
                 body = vkey
                 tail, head = [nbr for nbr in mesh.vertex_neighbors(vkey) if mesh.is_vertex_on_boundary(nbr)]
             break
         lizard = (tail, body, head)
+        print('Lizard initial position', lizard) #Check why this prints twice at the beginning, i.e. why does reset after initializing?
         return lizard
     
     def reset(self, seed=None, return_info=False, options=None):
         super().reset(seed=seed)
         self.initial_mesh_copy = CoarsePseudoQuadMesh.from_vertices_and_faces(*self.initial_mesh.to_vertices_and_faces())
         self.current_mesh = CoarsePseudoQuadMesh.from_vertices_and_faces(*self.initial_mesh.to_vertices_and_faces())
-        self.lizard = self.find_lizard(self.current_mesh)
+        self.lizard = self.position_lizard(self.current_mesh)
         self.action_string = ''
+        self.a_count = 0
+        self.copy_poles        = []
+        self.current_poles     = []
+
         self.current_step = 0
-        print("Environment reset.")
+        self.episode_number += 1
+        print(f"Environment reset. Starting episode {self.episode_number}.")
         obs = self.get_state()
         info = {}
         return (obs, info)
     
     def step(self, action):
         self.current_step += 1
-        
         action_letter = self.format_converter.from_discrete_to_letter([int(action)])
         self.action_string += action_letter
-
+        
         print(f"Step {self.current_step}: Action string - {self.action_string}")
 
-        #Apply the action to the current mesh IM CHECKING IF THIS WORKS ON INITIAL MESH
-        self.initial_mesh_copy = CoarsePseudoQuadMesh.from_vertices_and_faces(*self.initial_mesh.to_vertices_and_faces())
-        self.lizard = self.find_lizard(self.initial_mesh_copy)
+        #Apply the actions to initial_copy and store info in current_mesh
+        tail, body, head = lizard_atp(self.initial_mesh_copy, self.lizard, self.action_string)
 
-        print(f"Lizard before action: {self.lizard}")
-        
-        try:
-            tail, body, head = lizard_atp(self.initial_mesh_copy, self.lizard, self.action_string)
-            print(f"Lizard after action: {tail}, {body}, {head}")
-        except (ValueError, KeyError) as e:
-            print(f"Error in lizard_atp function: {e}")
-            reward = -1.0
-            terminated = True
-            truncated = True
-            obs, info = self.reset()
-            return obs, reward, terminated, truncated, info
-        
-        self.current_mesh = CoarsePseudoQuadMesh.from_vertices_and_faces(*self.initial_mesh_copy.to_vertices_and_faces())
-        
-        poles = []
         for fkey in self.initial_mesh_copy.faces():
             fv = self.initial_mesh_copy.face_vertices(fkey)
             if len(fv) == 3:
                 if body in fv:
-                    poles.append(self.current_mesh.vertex_coordinates(body))
+                    self.copy_poles.append(self.initial_mesh_copy.vertex_coordinates(body))
                 else:
                     'pbm identification pole'
-                    poles.append(self.current_mesh.vertex_coordinates(fv[0]))
-        
-        try:
-            if not self.current_mesh.is_manifold():
-                print('Mesh not manifold. Terminating episode.')
-                reward = -1.0
-                terminated = True
-                truncated = True
-                obs, info = self.reset()
-                return obs, reward, terminated, truncated, info
-        except KeyError as e:
-            print(f"KeyError while checking if mesh is manifold: {e}")
-            reward = -1.0
+                    self.copy_poles.append(self.initial_mesh_copy.vertex_coordinates(fv[0]))
+                
+        if not self.initial_mesh_copy.is_manifold():
+            print('Mesh not manifold. Terminating episode.')
+            reward = -0.01
             terminated = True
             truncated = True
             obs, info = self.reset()
             return obs, reward, terminated, truncated, info
-        
-        
-        if body not in self.current_mesh.vertices():
-            print(f"Body vertex {body} not found in the mesh. Terminating episode.")
-            reward = -1.0
-            terminated = True
-            truncated = True
-            obs, info = self.reset()
-            return obs, reward, terminated, truncated, info
-        
 
         #Post-process the mesh 
+        self.current_mesh = self.initial_mesh_copy
         self.post_processor.postprocess(self.current_mesh)
         
         terminated = self.is_terminal_state()
-        truncated = self.current_step >= self.max_steps or len(self.action_string) >= 20
+        truncated = self.current_step >= self.max_steps or len(self.action_string) >= 50
         reward = self.calculate_reward(terminated)
-        obs = self.get_state()
+        obs = self.get_state() #I think I also need to modify get_state
+        
+        if terminated:
+            print("Episode terminated.")
+        if truncated:
+            print("Episode truncated.")
 
-        if terminated or truncated:
-            obs, info = self.reset()
-            return obs, reward, terminated, truncated, info
+        #Reset initial_mesh_copy
+        self.initial_mesh_copy = self.initial_mesh
 
         return obs, reward, terminated, truncated, {}
     
     def calculate_reward(self, done):
-        terminal_features = MeshFeature(self.terminal_mesh).categorize_vertices(display_vertices = False)
+        #terminal_features = MeshFeature(self.terminal_mesh).categorize_vertices(display_vertices = False)
         current_features = MeshFeature(self.current_mesh).categorize_vertices(display_vertices = False)
 
-       # terminal_degrees = {vkey: self.terminal_mesh.vertex_degree(vkey) for vkey in self.terminal_mesh.vertices()}
-       # current_degrees  = {vkey: self.current_mesh.vertex_degree(vkey) for vkey in self.current_mesh.vertices()}        
-        
         #Extract degree information for boundary and interior vertices
         current_boundary_degree = current_features['boundary_vertices_by_degree']
-        terminal_boundary_degree = terminal_features['boundary_vertices_by_degree']
+        terminal_boundary_degree = self.terminal_features['boundary_vertices_by_degree']
         current_interior_degree = current_features['inside_vertices_by_degree']
-        terminal_interior_degree = terminal_features['inside_vertices_by_degree']
+        terminal_interior_degree = self.terminal_features['inside_vertices_by_degree']
         
         #Calculate the reward based on how close the current degrees are to the terminal degree
         reward = 0
@@ -219,20 +200,19 @@ class MeshEnvironment(gym.Env):
 
         return reward
 
-    
     def is_terminal_state(self):
-        terminal_features = MeshFeature(self.terminal_mesh).categorize_vertices(display_vertices=False)
+        #terminal_features = MeshFeature(self.terminal_mesh).categorize_vertices(display_vertices=False)
         current_features  = MeshFeature(self.current_mesh).categorize_vertices(display_vertices=False)
 
         boundary_mismatches = []
         interior_mismatches = []
 
-        for degree, info in terminal_features['boundary_vertices_by_degree'].items():
+        for degree, info in self.terminal_features['boundary_vertices_by_degree'].items():
             if degree not in current_features['boundary_vertices_by_degree'] or \
             info ['count'] != current_features['boundary_vertices_by_degree'][degree]['count']:
                 boundary_mismatches.append(degree)
             
-        for degree, info in terminal_features['inside_vertices_by_degree'].items():
+        for degree, info in self.terminal_features['inside_vertices_by_degree'].items():
             if degree not in current_features['inside_vertices_by_degree'] or \
             info ['count'] != current_features['inside_vertices_by_degree'][degree]['count']:
                 interior_mismatches.append(degree)
@@ -247,32 +227,31 @@ class MeshEnvironment(gym.Env):
         return False
     
     def get_state(self):
-        self.post_processor.postprocess(self.current_mesh)
-        vertices = np.array([self.current_mesh.vertex_coordinates(vkey) for vkey in self.current_mesh.vertices()])
+        vertices = np.array([self.current_mesh.vertex_coordinates(vkey) for vkey in self.current_mesh.vertices()], dtype=np.float32)
         
         if len(vertices) < self.max_vertices:
-            padding = np.zeros((self.max_vertices - len(vertices), 3))
+            padding = np.zeros((self.max_vertices - len(vertices), 3), dtype=np.float32)
             vertices = np.vstack((vertices, padding))
         vertices = vertices[:self.max_vertices]
 
         edges = []
-        edge_attrs = []
-
+        
         for u, v in self.current_mesh.edges():
             edges.append((u, v))
             edges.append((v, u))
-            edge_attrs.append([1.0])
-            edge_attrs.append([1.0])
-        
+            
         edge_index = np.array(edges, dtype=np.int32)
-        edge_attr  = np.array(edge_attrs, dtype=np.float32)
+        edge_attr = np.ones((edge_index.shape[0], 2), dtype=np.float32)
 
         if edge_index.shape[0] < self.max_vertices * 4:
-            padding = np.zeros((self.max_vertices * 4 - edge_index.shape[0], 2), dtype=np.int32)
-            edge_index = np.vstack((edge_index, padding))
-            padding_attr = np.zeros((self.max_vertices * 4 - edge_attr.shape[0], 1), dtype=np.float32)
+            padding_index = np.zeros((self.max_vertices * 4 - edge_index.shape[0], 2), dtype=np.int32)
+            edge_index = np.vstack((edge_index, padding_index))
+            padding_attr = np.zeros((self.max_vertices * 4 - edge_attr.shape[0], 2), dtype=np.float32)
             edge_attr = np.vstack((edge_attr, padding_attr))
 
-        observation = np.concatenate([vertices.flatten(), edge_index.flatten(), edge_attr.flatten()]).astype(np.float32)    
-        
-        return observation
+        return {
+            "vertices": vertices,
+            "edge_index": edge_index,
+            "edge_attr": edge_attr
+        }
+    

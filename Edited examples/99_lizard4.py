@@ -99,7 +99,7 @@ for k, string in enumerate(strings):
     mesh = CoarsePseudoQuadMesh.from_vertices_and_faces(*mesh0.to_vertices_and_faces())
     # tail, body, head = add_strip_lizard_2(mesh, lizard, string)
     tail, body, head = lizard_atp(mesh, lizard, string)
-    
+    ### MY QUESTION, WHY DO WE DO TAIL, BODY, HEAD = LIZARD_ATP HERE?
     poles = []
     for fkey in mesh.faces():
         fv = mesh.face_vertices(fkey)

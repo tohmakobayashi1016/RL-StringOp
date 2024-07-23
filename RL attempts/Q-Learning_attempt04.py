@@ -2,7 +2,7 @@ from stable_baselines3 import DQN
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold, BaseCallback
 from compas_quad.datastructures import CoarsePseudoQuadMesh
-from Environment_attempt05 import MeshEnvironment
+from Environment_attempt06 import MeshEnvironment
 from compas_viewer import Viewer
 
 import sys, os, time
@@ -61,7 +61,7 @@ env = MeshEnvironment(initial_mesh, terminal_mesh_json_path, max_steps = 20)
 check_env(env)
 
 # Define the RL model
-model = DQN('MlpPolicy', env, verbose=1)
+model = DQN('MultiInputPolicy', env, verbose=1)
 
 #Define the log file path
 log_file = 'training_log_4.csv'
