@@ -33,7 +33,7 @@ class MeshEnvironment(gym.Env):
 
         #Define action space
         self.action_space      = Discrete(3)
-        self.action_string     = ''
+        self.action_string     = [''] 
         
         # Define observation space using Dict
         self.max_vertices = max_vertices
@@ -95,7 +95,7 @@ class MeshEnvironment(gym.Env):
                 tail, head = [nbr for nbr in mesh.vertex_neighbors(vkey) if mesh.is_vertex_on_boundary(nbr)]
             break
         lizard = (tail, body, head)
-        print('Lizard initial position', lizard) #Check why this prints twice at the beginning, i.e. why does reset after initializing?
+        print('Lizard initial position', lizard) 
         return lizard
     
     def reset(self, seed=None, return_info=False, options=None):
@@ -103,7 +103,7 @@ class MeshEnvironment(gym.Env):
         self.initial_mesh_copy = CoarsePseudoQuadMesh.from_vertices_and_faces(*self.initial_mesh.to_vertices_and_faces())
         self.current_mesh = CoarsePseudoQuadMesh.from_vertices_and_faces(*self.initial_mesh.to_vertices_and_faces())
         self.lizard = self.position_lizard(self.current_mesh)
-        self.action_string = ''
+        self.action_string = ['']
         self.a_count = 0
         self.copy_poles        = []
         self.current_poles     = []
@@ -118,12 +118,19 @@ class MeshEnvironment(gym.Env):
     def step(self, action):
         self.current_step += 1
         action_letter = self.format_converter.from_discrete_to_letter([int(action)])
-        self.action_string += action_letter
+        self.action_string[0] += action_letter
         
-        print(f"Step {self.current_step}: Action string - {self.action_string}")
+        print(f"Step {self.current_step}: Action string - {self.action_string[0]}")
 
+        #Position lizard
+        self.lizard = self.position_lizard(self.initial_mesh_copy)
+
+        #Debugging: Print vertices and faces before lizard_atp
+        print(f"Before lizard_atp: Vertices: {list(self.current_mesh.vertices())}, Faces: {list(self.current_mesh.faces())}")
+        
         #Apply the actions to initial_copy and store info in current_mesh
-        tail, body, head = lizard_atp(self.initial_mesh_copy, self.lizard, self.action_string)
+        tail, body, head = lizard_atp(self.initial_mesh_copy, self.lizard, self.action_string[0])
+        self.copy_poles  = []
 
         for fkey in self.initial_mesh_copy.faces():
             fv = self.initial_mesh_copy.face_vertices(fkey)
@@ -133,7 +140,10 @@ class MeshEnvironment(gym.Env):
                 else:
                     'pbm identification pole'
                     self.copy_poles.append(self.initial_mesh_copy.vertex_coordinates(fv[0]))
-                
+
+        #Debugging: Print vertices and faces before post-process
+        print(f"After lizard_atp: Vertices: {list(self.current_mesh.vertices())}, Faces: {list(self.current_mesh.faces())}")
+        
         if not self.initial_mesh_copy.is_manifold():
             print('Mesh not manifold. Terminating episode.')
             reward = -0.01
@@ -143,21 +153,41 @@ class MeshEnvironment(gym.Env):
             return obs, reward, terminated, truncated, info
 
         #Post-process the mesh 
-        self.current_mesh = self.initial_mesh_copy
+        self.post_processor.postprocess(self.initial_mesh_copy)
+
+        #Debugging: Print vertices and faces after post-process [INITIAL COPY]
+        print(f"Initial copy after post-process: Vertices: {list(self.initial_mesh_copy.vertices())}, Faces: {list(self.initial_mesh_copy.faces())}")
+
+        #Update self.current_mesh with self.initial_mesh_copy
+        self.current_mesh = CoarsePseudoQuadMesh.from_vertices_and_faces(*self.initial_mesh_copy.to_vertices_and_faces())
         self.post_processor.postprocess(self.current_mesh)
+        #self.current_mesh = self.initial_mesh_copy
+        self.current_poles = self.copy_poles.copy
         
+        #Update the list of vertices at the end of step
+        self.update_vertices()
+
+        #Debugging: Print vertices and faces after post-process [INITIAL COPY]
+        print(f"Current mesh after post-process: Vertices: {list(self.current_mesh.vertices())}, Faces: {list(self.current_mesh.faces())}")
+
         terminated = self.is_terminal_state()
-        truncated = self.current_step >= self.max_steps or len(self.action_string) >= 50
+        truncated = self.current_step >= self.max_steps or len(self.action_string[0]) >= 50
         reward = self.calculate_reward(terminated)
         obs = self.get_state() #I think I also need to modify get_state
         
         if terminated:
             print("Episode terminated.")
+            obs, info = self.reset()
+            return obs, reward, terminated, truncated, info
         if truncated:
             print("Episode truncated.")
+            obs, info = self.reset()
+            return obs, reward, terminated, truncated, info
+
 
         #Reset initial_mesh_copy
-        self.initial_mesh_copy = self.initial_mesh
+        self.initial_mesh_copy = CoarsePseudoQuadMesh.from_vertices_and_faces(*self.initial_mesh.to_vertices_and_faces())
+        self.copy_poles = []
 
         return obs, reward, terminated, truncated, {}
     
@@ -254,4 +284,7 @@ class MeshEnvironment(gym.Env):
             "edge_index": edge_index,
             "edge_attr": edge_attr
         }
-    
+    def update_vertices(self):
+        #Update the list of vertices based on the current mesh
+        updated_vertices = {vkey: self.current_mesh.vertex_coordinates(vkey) for vkey in self.current_mesh.vertices()}
+        self.current_mesh.update_default_vertex_attributes(updated_vertices)
