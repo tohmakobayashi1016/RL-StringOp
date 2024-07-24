@@ -51,7 +51,7 @@ initial_mesh_faces = [[0, 1, 2, 3]]
 initial_mesh = CoarsePseudoQuadMesh.from_vertices_and_faces(initial_mesh_vertices, initial_mesh_faces)
 
 # Path to the terminal mesh JSON file
-terminal_mesh_json_path = r'C:\Users\footb\Desktop\Thesis\String-RL\Output\RL-attempt-01\trial.json'
+terminal_mesh_json_path = r'C:\Users\footb\Desktop\Thesis\String-RL\RL-StringOp\terminal_mesh\trial.json'
 
 # Initialize environment
 env = MeshEnvironment(initial_mesh, terminal_mesh_json_path, max_steps = 20)
