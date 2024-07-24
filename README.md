@@ -17,4 +17,4 @@ Tailor this to your own set-up
 6. Install dependencies using the given requirements.txt
 ```pip install -r requirements.txt```
 7. Replace addition2.py in the grammar directory of compas_quad within the virtual environment with the addition2.py placed in \Change. The directory can be found by navigating through: ```C:\Users\footb\anaconda3\envs\stringRL\Lib\site-packages\compas_quad\grammar\addition2.py```
-8. Run Q-Learning_attempt04.py or the latest attempt
+8. Run Q-Learning_attempt04.py otherwise the latest attempt
