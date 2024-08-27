@@ -1,4 +1,4 @@
-import os, sys
+import os, sys, json
 from time import time
 from math import pi, cos, sin
 from compas.datastructures import Mesh
@@ -7,8 +7,8 @@ from compas_quad.grammar.addition2 import add_strip_lizard, add_strip_lizard_2, 
 from compas_quad.grammar.lizard import string_generation_brute, string_generation_random, string_generation_structured, string_generation_evolution
 from compas_fd.solvers import fd_numpy
 from compas_viewer.viewer import Viewer
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Classes')))
-from feature_extraction import MeshFeature
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from Classes.feature_extraction import MeshFeature
 
 
 # custom postprocessing function
@@ -86,11 +86,43 @@ print('lizard initial position', lizard)
 # strings = ['ata', 'atta', 'attta', 'atttta']
 strings = ['tpptpaatattt']
 # strings = ['attatpatatptatta']
-
+#strings = ['']
 # apply
 t0 = time()
 mesh2string = {}
 categorized_vertices_all_meshes = {}
+
+def load_terminal_mesh(json_path):
+        print(f"Loading terminal mesh from {json_path}...")
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        if data['dtype'] != 'compas.datastructures/Mesh':
+            raise ValueError("Incorrect JSON format")
+        
+        mesh = Mesh()
+        #self.post_processor.postprocess(mesh)
+        vertices = data['data']['vertex']
+        faces = data['data']['face']
+
+        for key, value in vertices.items():
+            mesh.add_vertex(int(key), x=value['x'], y=value['y'], z=value['z'])
+        
+        for key, value in faces.items():
+            mesh.add_face(value)
+        
+        vertices_list = list(mesh.vertices())
+        faces_list = list(mesh.faces())
+        print(f"Terminal mesh vertices: {vertices_list}")
+        print(f"Terminal mesh faces: {faces_list}")
+        
+        if not vertices_list or not faces_list:
+            raise ValueError("Loaded mesh has no vertices or faces")
+        
+        return mesh
+
+terminal_mesh_json_path = r'C:\Users\footb\Desktop\Thesis\String-RL\RL-StringOp\terminal_mesh\trial.json'
+terminal_mesh = load_terminal_mesh(terminal_mesh_json_path)
+t_mesh = postprocessing(terminal_mesh)
 
 for k, string in enumerate(strings):
     print(string)
@@ -99,7 +131,7 @@ for k, string in enumerate(strings):
     mesh = CoarsePseudoQuadMesh.from_vertices_and_faces(*mesh0.to_vertices_and_faces())
     # tail, body, head = add_strip_lizard_2(mesh, lizard, string)
     tail, body, head = lizard_atp(mesh, lizard, string)
-    ### MY QUESTION, WHY DO WE DO TAIL, BODY, HEAD = LIZARD_ATP HERE?
+    
     poles = []
     for fkey in mesh.faces():
         fv = mesh.face_vertices(fkey)
@@ -145,8 +177,6 @@ for k, string in enumerate(strings):
     mesh2string[mesh] = string
 
     
-        
-
 # results
 t1 = time()
 print('computation time {}s for {} meshes'.format(round(t1 - t0, 3), len(mesh2string)))
@@ -166,9 +196,13 @@ else:
         mesh.move([1.5 * (k + 1), 0.0, 0.0])
 
 if view:
+    mash = Mesh.from_json(terminal_mesh_json_path)
+    print(mash)
+    mash1 = CoarsePseudoQuadMesh.from_vertices_and_faces(*mash.to_vertices_and_faces())
+    print(mash1)
+    postprocessing(mash1)
+    viewer.scene.add(mash1)
     for mesh in mesh2string:
         viewer.scene.add(mesh)
     viewer.show()
-
-
 

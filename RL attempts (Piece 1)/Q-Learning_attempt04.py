@@ -6,8 +6,8 @@ from Environment_attempt06 import MeshEnvironment
 from compas_viewer import Viewer
 
 import sys, os, time
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Classes')))
-from FormatConverter import FormatConverter
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from Classes.FormatConverter import FormatConverter
 class LoggingCallback(BaseCallback):
     def __init__(self, log_file, verbose=0):
         super(LoggingCallback, self).__init__(verbose)

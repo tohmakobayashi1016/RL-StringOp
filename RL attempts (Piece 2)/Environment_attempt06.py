@@ -3,16 +3,17 @@ import gymnasium as gym
 from gymnasium.spaces import Box, Discrete, Dict
 import sys, os, json
 from math import pi, cos, sin
+from compas_viewer.viewer import Viewer
 
 from compas.datastructures import Mesh
 from compas_quad.datastructures import CoarsePseudoQuadMesh
 from compas_quad.grammar.addition2 import lizard_atp
 from compas_fd.solvers import fd_numpy
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Classes')))
-from feature_extraction import MeshFeature
-from FormatConverter import FormatConverter
-from PostProcessor import PostProcessor
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from Classes.feature_extraction import MeshFeature
+from Classes.FormatConverter import FormatConverter
+from Classes.PostProcessor import PostProcessor
 
 class MeshEnvironment(gym.Env):
     def __init__(self, initial_mesh, terminal_mesh_json_path, max_steps=100, max_vertices=50):

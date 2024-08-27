@@ -1,8 +1,11 @@
 import numpy as np
-import compas
+import random
 from compas.datastructures import Mesh
 from compas.geometry import centroid_polygon, area_polygon, length_vector, subtract_vectors
 from compas_quad.datastructures import CoarsePseudoQuadMesh
+from compas_viewer.viewer import Viewer
+from compas.colors import Color, ColorDict
+
 
 class MeshFeature:
     def __init__(self, mesh):
@@ -43,9 +46,15 @@ class MeshFeature:
     def categorize_vertices(self, display_vertices=True):
         boundary_vertices = set(self.mesh.vertices_on_boundary())
         inside_vertices = set(self.mesh.vertices()) - boundary_vertices
-
+        
         boundary_vertices_by_degree = {}
         inside_vertices_by_degree = {}
+
+        vertex_colors = ColorDict(default=Color.white())
+
+        boundary_color = Color.red()
+        for vertex in boundary_vertices:
+            vertex_colors[vertex] = boundary_color
 
         # Categorize boundary vertices by degree
         for vertex in boundary_vertices:
@@ -55,17 +64,20 @@ class MeshFeature:
             boundary_vertices_by_degree[degree]["count"] += 1
             boundary_vertices_by_degree[degree]["vertices"].add(vertex)
 
-        # Categorize inside vertices by degree
+        # Categorize inside vertices by degree and assign colors
         for vertex in inside_vertices:
             degree = self.mesh.vertex_degree(vertex)
             if degree not in inside_vertices_by_degree:
                 inside_vertices_by_degree[degree] = {"count": 0, "vertices": set()}
             inside_vertices_by_degree[degree]["count"] += 1
             inside_vertices_by_degree[degree]["vertices"].add(vertex)
+            vertex_colors[vertex] = self.get_color_for_inside_degree(degree)
 
         result = {
+            "boundary_vertices": boundary_vertices,
             "boundary_vertices_by_degree": boundary_vertices_by_degree,
-            "inside_vertices_by_degree": inside_vertices_by_degree
+            "inside_vertices_by_degree": inside_vertices_by_degree,
+            "vertex_colors": vertex_colors
         }
 
         # Print statement to display the categorized vertices
@@ -87,7 +99,18 @@ class MeshFeature:
                 print(f"Degree {degree}: Count = {info['count']}")
 
         return result
-          
 
+    
+    def get_color_for_inside_degree(self, degree):
+       #Assign colors to inside vertices based on the degree of boundary vertices
+        if degree == 3:
+            return Color.cyan()
+        elif degree == 4:
+            return Color.magenta()
+        elif degree == 5:
+            return Color.yellow()
+        else:
+            return Color.orange()
        
+
     
