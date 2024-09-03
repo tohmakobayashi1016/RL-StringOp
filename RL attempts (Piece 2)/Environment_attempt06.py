@@ -9,6 +9,7 @@ from compas.datastructures import Mesh
 from compas_quad.datastructures import CoarsePseudoQuadMesh
 from compas_quad.grammar.addition2 import lizard_atp
 from compas_fd.solvers import fd_numpy
+from compas.colors import Color
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Classes.feature_extraction import MeshFeature
@@ -285,6 +286,39 @@ class MeshEnvironment(gym.Env):
             "edge_index": edge_index,
             "edge_attr": edge_attr
         }
+    
+    def get_vertex_colors(self): #NEW ADDITION 8-27
+        #Initialize all vertices to a default color (e.g. white)
+        vertex_colors = {vkey: Color.white() for vkey in self.current_mesh.vertices()}
+        #Set the lizard vertices to hot pink
+        tail, body, head = self.lizard
+        hotpink = Color(1.0,0.0,0.5)
+        vertex_colors[tail] = hotpink
+        vertex_colors[body] = hotpink
+        vertex_colors[head] = hotpink
+
+        return vertex_colors
+
+    def render(self): #NEW ADDITION 8-27
+        viewer = Viewer()
+        vertex_colors = self.get_vertex_colors()
+        facecolor = {fkey: Color.green() for fkey in mesh1.faces()}
+        linecolor = {ekey: Color.black() for ekey in mesh1.edges()}
+    
+        viewer.scene.add(
+            self.current_mesh, 
+            show_points=True, 
+            use_vertexcolors=True, 
+            facecolor=facecolor, 
+            linecolor=linecolor, 
+            pointcolor=vertex_colors,
+            #pointcolor=vertexcolor,
+            pointsize=1.0
+        )
+
+        viewer.show()
+
+
     def update_vertices(self):
         #Update the list of vertices based on the current mesh
         updated_vertices = {vkey: self.current_mesh.vertex_coordinates(vkey) for vkey in self.current_mesh.vertices()}
