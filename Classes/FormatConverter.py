@@ -1,7 +1,7 @@
 class FormatConverter:
     def __init__(self):
         #Define the mapping of discrete actions to letter actions 
-        self.action_map = {0: 'a', 1: 't', 2: 'p'}
+        self.action_map = {0: 'a', 1: 't', 2: 'p', 3: 'd'}
 
     def from_discrete_to_letter(self, discrete_actions):
         #Convert the list of discrete actions to corresponding letter actions

@@ -86,7 +86,7 @@ print('lizard initial position', lizard)
 # produce strings
 # strings = ['t', 'tt', 'ttt', 'tttt']
 # strings = ['ata', 'atta', 'attta', 'atttta']
-strings = ['tatapapaaptataptaap']
+strings = ['ttapttaaptpt']
 # strings = ['attatpatatptatta']
 
 # apply
@@ -159,13 +159,13 @@ if view:
         results = feature_extractor.categorize_vertices()
         vertex_colors = results["vertex_colors"]
         vertex_colors_dict = {key: color for key, color in vertex_colors.items()}
-        facecolor = {fkey:Color.green() for fkey in mesh.faces()}
+        facecolor = {fkey:Color.white() for fkey in mesh.faces()}
         linecolor = {ekey:Color.black() for ekey in mesh.edges()}
 
         viewer.scene.add(
             mesh,
             show_points=True,
-            use_vertexcolors=True,
+            use_vertexcolors=False,
             facecolor=facecolor,
             linecolor=linecolor,
             pointcolor=vertex_colors_dict,

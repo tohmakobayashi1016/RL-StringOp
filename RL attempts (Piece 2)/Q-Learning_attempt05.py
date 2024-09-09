@@ -2,7 +2,7 @@ from stable_baselines3 import DQN
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold, BaseCallback, CallbackList
 from compas_quad.datastructures import CoarsePseudoQuadMesh
-from Environment_attempt06 import MeshEnvironment
+from Environment_attempt07 import MeshEnvironment
 from compas_viewer import Viewer
 
 import sys, os, time
@@ -88,14 +88,14 @@ check_env(env)
 model = DQN('MultiInputPolicy', env, verbose=1)
 
 #Define the log file path
-log_file = 'training_log_a_ver.csv'
+log_file = 'training_log_t_ver.csv'
 
 #Initialize the log file
 with open(log_file, 'w') as f:
     f.write('reward, length,actions\n')
 
 #Initialize callbacks
-number_of_design_episode = 500
+number_of_design_episode = 200
 Logging_callback = LoggingCallback(log_file)
 episode_callback = StopTrainingOnEpisodesCallback(num_episodes=number_of_design_episode, verbose=1)
 
@@ -118,10 +118,10 @@ elapsed_time = time.time() - start_time
 print(f"Elapsed time for {number_of_design_episode} episodes: {elapsed_time:.2f} seconds")
 
 # Save the model
-model.save("dqn_mesh_graph_a_ver")
+model.save("dqn_mesh_graph_t_ver")
 
 # Load the model
-model = DQN.load("dqn_mesh_graph_a_ver")
+model = DQN.load("dqn_mesh_graph_t_ver")
 
 # Evaluate the trained agent
 state, _ = env.reset()

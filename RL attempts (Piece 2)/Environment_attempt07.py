@@ -54,6 +54,9 @@ class MeshEnvironment(gym.Env):
         self.lizard            = self.position_lizard(self.initial_mesh_copy)
         self.last_action       = None
         self.a_count           = 0
+        self.p_count           = 0
+        self.t_count           = 0
+        #self.d_count           = 0
         self.copy_poles        = []
         self.current_poles     = []
 
@@ -111,6 +114,10 @@ class MeshEnvironment(gym.Env):
         self.lizard = self.position_lizard(self.current_mesh)
         self.action_string = ['']
         self.a_count = 0
+        self.p_count = 0
+        self.t_count = 0
+        #self.d_count = 0
+        
         self.copy_poles        = []
         self.current_poles     = []
 
@@ -128,46 +135,54 @@ class MeshEnvironment(gym.Env):
     
     def step(self, action):
         try:
-            #Perform the action and modify the mesh
+            #Step increment and action execution
             self.current_step += 1
             action_letter = self.format_converter.from_discrete_to_letter([int(action)])
             self.action_string[0] += action_letter
         
             print(f"Step {self.current_step}: Action string - {self.action_string[0]}")
 
-            #Track consecutive 'a'
+            #Track consecutive 'a' selection
             if action_letter == 'a':
                 self.a_count += 1
+                self.p_count = 0
+                self.t_count = 0
+                self.d_count = 0
+            elif action_letter == 'p':
+                self.a_count = 0
+                self.p_count += 1
+                self.t_count = 0
+                self.d_count = 0
+            elif action_letter == 't':
+                self.a_count = 0
+                self.p_count = 0
+                self.t_count += 1
+                self.d_count = 0
+                
             else:
-                self.a_count = 0 #Reset counter when different action is selected
+                self.d_count = 1 #Reset counter when different action is applied
+                
             
-            #Penalize if 'a' is selected too much
-            penalty = self.penalize_repeated_a()
+            #Penalize consecutive 'a' selection
+            penalty = self.penalize_repeated_actions()
             
             #Position lizard
             self.lizard = self.position_lizard(self.initial_mesh_copy)
 
-            #Debugging: Print vertices and faces before lizard_atp
-            #print(f"Before lizard_atp: Vertices: {list(self.current_mesh.vertices())}, Faces: {list(self.current_mesh.faces())}")
-            #Apply the actions to initial_copy and store info in current_mesh
-        
-            #Execute action and modify the mesh
-            tail, body, head = lizard_atp(self.initial_mesh_copy, self.lizard, self.action_string[0]) #THIS IS THE MAIN FUNCTION
-            
-            #If lizard_atp returns none, it means the operation failed
-            if tail is None or body is None or head is None:
-                raise ValueError("Invalid operation during lizard_atp")
+            #Execute action and modify the mesh: apply actions to initial_copy, store info. in current_mesh
+            tail, body, head = lizard_atp(self.initial_mesh_copy, self.lizard, self.action_string[0])
 
             #Observation space formatting
             obs, valid = self.get_state()
             
             if not valid:
-                print("Face with more than 4 vertices detected. Terminating episode.")
-                reward = -1.0
-                terminated = True
-                truncated = False
-                info = {"error": "Face with more than 4 vertices detected."}
-                return obs, reward + penalty, terminated, truncated, info
+                return self.terminate_episode(obs, -0.5 + penalty, "Face with more than 4 vertices detected.")
+           
+            if not self.validate_mesh_faces(self.initial_mesh_copy):
+                return self.terminate_episode(obs, -0.5 + penalty, "Invalid faces detected.")
+            
+            if not self.initial_mesh_copy.is_manifold():
+                return self.terminate_episode(obs, -0.01 + penalty, "Mesh not manifold.")
 
         except ValueError as e:
             print(f"Error: {e}")
@@ -177,63 +192,29 @@ class MeshEnvironment(gym.Env):
             obs = self.get_state()
             info = {"error": str(e)}
             return None, reward + penalty, terminated, truncated, info
-        
-        for fkey in self.initial_mesh_copy.faces():
-            fv = self.initial_mesh_copy.face_vertices(fkey)
-            if len(fv) == 3:
-                if body in fv:
-                    self.copy_poles.append(self.initial_mesh_copy.vertex_coordinates(body))
-                else:
-                    'pbm identification pole'
-                    self.copy_poles.append(self.initial_mesh_copy.vertex_coordinates(fv[0]))
 
         #Debugging: Print vertices and faces before post-process
         #print(f"After lizard_atp: Vertices: {list(self.current_mesh.vertices())}, Faces: {list(self.current_mesh.faces())}")
-        
-        if not self.initial_mesh_copy.is_manifold():
-            print('Mesh not manifold. Terminating episode.')
-            reward = -0.01
-            terminated = True
-            truncated = True
-            obs, info = self.reset()
-            return obs, reward, terminated, truncated, info
-
-        #Post-process the mesh 
-        self.post_processor.postprocess(self.initial_mesh_copy)
+       
+        #Debugging: Print vertices and faces after post-process [INITIAL COPY]
+        #print(f"Initial copy after post-process: Vertices: {list(self.initial_mesh_copy.vertices())}, Faces: {list(self.initial_mesh_copy.faces())}")
 
         #Debugging: Print vertices and faces after post-process [INITIAL COPY]
-        print(f"Initial copy after post-process: Vertices: {list(self.initial_mesh_copy.vertices())}, Faces: {list(self.initial_mesh_copy.faces())}")
+        #print(f"Current mesh after post-process: Vertices: {list(self.current_mesh.vertices())}, Faces: {list(self.current_mesh.faces())}")
 
-        #Update self.current_mesh with self.initial_mesh_copy
-        self.current_mesh = CoarsePseudoQuadMesh.from_vertices_and_faces(*self.initial_mesh_copy.to_vertices_and_faces())
-        self.post_processor.postprocess(self.current_mesh)
-        #self.current_mesh = self.initial_mesh_copy
-        self.current_poles = self.copy_poles.copy
-        
-        #Update the list of vertices at the end of step
-        self.update_vertices()
+        #Post-process and update the mesh after action
+        self.process_mesh_after_action(body)
 
-        #Debugging: Print vertices and faces after post-process [INITIAL COPY]
-        print(f"Current mesh after post-process: Vertices: {list(self.current_mesh.vertices())}, Faces: {list(self.current_mesh.faces())}")
-
+        #Calculate the reward and check if the episode is terminated or truncated 
         terminated = self.is_terminal_state()
         truncated = self.current_step >= self.max_steps or len(self.action_string[0]) >= 50
         reward = self.calculate_reward(terminated) + penalty
-        #Is this reward supposed to be terminated or is terminal step
-
-        #obs = self.get_state() #I think I also need to modify get_state
         
-        if terminated:
-            print("Episode terminated.")
-            obs, info = self.reset()
-            return obs, reward, terminated, truncated, info
-        if truncated:
-            print("Episode truncated.")
+        if terminated or truncated:
             obs, info = self.reset()
             return obs, reward, terminated, truncated, info
 
-
-        #Reset initial_mesh_copy
+        #Reset initial_mesh_copy for next step
         self.initial_mesh_copy = CoarsePseudoQuadMesh.from_vertices_and_faces(*self.initial_mesh.to_vertices_and_faces())
         self.copy_poles = []
 
@@ -278,21 +259,75 @@ class MeshEnvironment(gym.Env):
 
         return reward
 
-    def penalize_repeated_a(self):
+    def process_mesh_after_action(self, body):
+        """
+        Post-process the mesh after the action and update the current state.
+        """
+        for fkey in self.initial_mesh_copy.faces():
+            fv = self.initial_mesh_copy.face_vertices(fkey)
+            if len(fv) == 3:
+                self.copy_poles.append(self.initial_mesh_copy.vertex_coordinates(body if body in fv else fv[0]))
+
+        #Post process the mesh
+        self.post_processor.postprocess(self.initial_mesh_copy)
+
+        #Update the current mesh
+        self.current_mesh = CoarsePseudoQuadMesh.from_vertices_and_faces(*self.initial_mesh_copy.to_vertices_and_faces())
+        self.post_processor.postprocess(self.current_mesh)
+
+        #Update the current poles and vertices
+        self.current_poles = self.copy_poles.copy()
+        self.update_vertices()
+
+    def terminate_episode(self, obs, reward, error_message):
+
+        """
+        Handle episode termination with an error message and return values.
+        """
+        print(f"{error_message} Terminating episode.")
+        terminated = True
+        truncated = False
+        return obs, reward, terminated, truncated, {"error": error_message}
+
+    def penalize_repeated_actions(self):
 
         """
         
-        Penalize repeated selection of the 'a' action
-        If 'a' is selected consectuively, apply punishment.
+        Penalize repeated selection of repeated action
+        i.e. if 'a' is selected consectuively, apply punishment.
 
         """
-        max_consecutive_a = 3
-        penalty_value = -0.1
+        max_consecutive_act = 3
+        penalty = 0
 
-        if self.a_count >= max_consecutive_a:
+        if self.a_count >= max_consecutive_act:
             print(f"Penalty applied for {self.a_count} consecutive 'a' actions.")
-            return penalty_value * self.a_count
-        return 0
+            penalty -= 0.05 * self.a_count
+
+        if self.p_count >= max_consecutive_act:
+            print(f"Penalty applied for {self.p_count} consecutive 'p' actions.")
+            penalty -= 0.1 * self.p_count
+        
+        if self.t_count >= max_consecutive_act:
+            print(f"Penalty applied for {self.t_count} consecutive 't' actions.")
+            penalty -= 0.1 * self.t_count
+
+        if self.d_count >= max_consecutive_act:
+            print(f"Penalty applied for {self.d_count} consecutive 'd' actions.")
+            penalty -= 0.1 * self.d_count
+
+        return penalty
+
+    def validate_mesh_faces(self, mesh):
+        """
+        Validate the faces of the mesh to ensure no invalid keys are present.
+        Return True if valid, False if any invalid faces are found.
+        """
+        for fkey in mesh.faces():
+            if fkey is None:
+                print(f"Invalid face keys: {fkey}")
+                return False
+            return True
 
     def is_terminal_state(self):
         #terminal_features = MeshFeature(self.terminal_mesh).categorize_vertices(display_vertices=False)

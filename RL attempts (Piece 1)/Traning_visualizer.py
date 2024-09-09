@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 # Path to the log file
-log_file = 'training_log.csv'
+log_file = 'training_log_x.csv'
 
 # Read the log file
 data = pd.read_csv(log_file)

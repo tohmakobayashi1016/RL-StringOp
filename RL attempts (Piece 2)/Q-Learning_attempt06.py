@@ -2,7 +2,7 @@ from stable_baselines3 import DQN
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold, BaseCallback, CallbackList
 from compas_quad.datastructures import CoarsePseudoQuadMesh
-from Environment_attempt06 import MeshEnvironment
+from Environment_attempt07 import MeshEnvironment
 from compas_viewer import Viewer
 
 import sys, os, time
@@ -85,17 +85,23 @@ env = MeshEnvironment(initial_mesh, terminal_mesh_json_path, max_steps = 20)
 check_env(env)
 
 # Define the RL model
-model = DQN('MultiInputPolicy', env, verbose=1)
+model = DQN('MultiInputPolicy', 
+        env, 
+        verbose=1,
+        exploration_fraction=0.2,
+        exploration_initial_eps=0.9,
+        exploration_final_eps=0.1
+)
 
 #Define the log file path
-log_file = 'training_log_a_ver.csv'
+log_file = 'training_log_exp_ver.csv'
 
 #Initialize the log file
 with open(log_file, 'w') as f:
     f.write('reward, length,actions\n')
 
 #Initialize callbacks
-number_of_design_episode = 500
+number_of_design_episode = 100
 Logging_callback = LoggingCallback(log_file)
 episode_callback = StopTrainingOnEpisodesCallback(num_episodes=number_of_design_episode, verbose=1)
 
@@ -111,17 +117,21 @@ start_time = time.time()
 
 # Train the model
 model._last_obs = None
-model.learn(total_timesteps=number_of_design_episode * env.max_steps, log_interval = 4, reset_num_timesteps=False, callback=callback)
+model.learn(total_timesteps=number_of_design_episode * env.max_steps, 
+            log_interval = 4, 
+            reset_num_timesteps=False, 
+            callback=callback
+)
 
 # Calculate elapsed time
 elapsed_time = time.time() - start_time
 print(f"Elapsed time for {number_of_design_episode} episodes: {elapsed_time:.2f} seconds")
 
 # Save the model
-model.save("dqn_mesh_graph_a_ver")
+model.save("dqn_mesh_graph_exp_ver")
 
 # Load the model
-model = DQN.load("dqn_mesh_graph_a_ver")
+model = DQN.load("dqn_mesh_graph_exp_ver")
 
 # Evaluate the trained agent
 state, _ = env.reset()
