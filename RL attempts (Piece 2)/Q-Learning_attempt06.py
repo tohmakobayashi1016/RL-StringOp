@@ -104,13 +104,13 @@ with open(log_file, 'w') as f:
 number_of_design_episode = 100
 Logging_callback = LoggingCallback(log_file)
 episode_callback = StopTrainingOnEpisodesCallback(num_episodes=number_of_design_episode, verbose=1)
+reward_callback  = StopTrainingOnRewardThreshold(reward_threshold=0.9, verbose=1)
+
+#Initialize EvalCallback
+eval_callback    = EvalCallback(env, callback_on_new_best=reward_callback, eval_freq=1000, verbose=1)
 
 #Combine callbacks
-callback =  CallbackList([Logging_callback, episode_callback])
-
-#Define callbacks to stop training once a reward threshold is reached
-#callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=0.9, verbose=1)
-#eval_callback = EvalCallback(env, callback_on_new_best=callback_on_best, eval_freq=1000, verbose=1)
+callback =  CallbackList([Logging_callback, episode_callback, eval_callback])
 
 #Start profiling
 start_time = time.time()
