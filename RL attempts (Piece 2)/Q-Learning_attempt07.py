@@ -2,7 +2,7 @@ from stable_baselines3 import DQN
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold, BaseCallback, CallbackList
 from compas_quad.datastructures import CoarsePseudoQuadMesh
-from Environment_attempt07 import MeshEnvironment
+from Environment_attempt08 import MeshEnvironment
 from compas_viewer import Viewer
 
 import sys, os, time
@@ -76,10 +76,10 @@ initial_mesh_faces = [[0, 1, 2, 3]]
 initial_mesh = CoarsePseudoQuadMesh.from_vertices_and_faces(initial_mesh_vertices, initial_mesh_faces)
 
 # Path to the terminal mesh JSON file
-terminal_mesh_json_path = r'C:\Users\footb\Desktop\Thesis\String-RL\RL-StringOp\terminal_mesh\trial.json'
+terminal_mesh_json_path = r'C:\Users\footb\Desktop\Thesis\String-RL\Output\meaningful\atta.json'
 
 # Initialize environment
-env = MeshEnvironment(initial_mesh, terminal_mesh_json_path, max_steps = 20)
+env = MeshEnvironment(initial_mesh, terminal_mesh_json_path, max_steps = 5)
 
 # Check the environment
 check_env(env)
@@ -98,10 +98,10 @@ log_file = 'training_log_disregard.csv'
 
 #Initialize the log file
 with open(log_file, 'w') as f:
-    f.write('reward, length,actions\n')
+    f.write('reward,length,actions\n')
 
 #Initialize callbacks
-number_of_design_episode = 100
+number_of_design_episode = 200
 Logging_callback = LoggingCallback(log_file)
 episode_callback = StopTrainingOnEpisodesCallback(num_episodes=number_of_design_episode, verbose=1)
 reward_callback  = StopTrainingOnRewardThreshold(reward_threshold=0.9, verbose=1)
@@ -136,8 +136,10 @@ model = DQN.load("dqn_mesh_graph_disregard")
 # Evaluate the trained agent
 state, _ = env.reset()
 done = False
+max_iterations = 1000
+iteration = 0
 
-while not done:
+while not done and iteration < max_iterations:
     action, _states = model.predict(state, deterministic=True)
     try:
         state, reward, done, truncated, info = env.step(action)
@@ -150,9 +152,9 @@ while not done:
         print(f"Penalty applied due to error: {info['error']}")
     print(f"Action: {action}, Reward: {reward}, Done: {done}, Truncated: {truncated}")
 
-# Visualize the final mesh
-view = False
-if view:
-    viewer = Viewer()
-    viewer.scene.add(env.current_mesh)
-    viewer.show()
+    print(f"Iteration: {iteration}, Action: {action}, Reward: {reward}, Done: {done}, Truncated: {truncated}")
+    iteration += 1
+
+if iteration >= max_iterations:
+    print("Warning: The loop exceeded the maximum number of iterations and was stopped.")
+

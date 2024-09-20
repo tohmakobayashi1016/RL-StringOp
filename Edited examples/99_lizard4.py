@@ -8,7 +8,10 @@ from compas_quad.grammar.lizard import string_generation_brute, string_generatio
 from compas_fd.solvers import fd_numpy
 from compas_viewer.viewer import Viewer
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from Classes.feature_extraction import MeshFeature
+from Classes.feature_extraction_lizard_position import MeshFeature
+from compas.colors import Color
+
+import pandas as pd
 
 
 # custom postprocessing function
@@ -50,7 +53,9 @@ postprocess = True
 densify = True
 array = False
 view = True
-export_json = True
+export_json = False
+
+log_file = r'C:\Users\footb\Desktop\Thesis\String-RL\RL-StringOp\training_log_exp_ver.csv'
 
 ### intialise ###
 
@@ -85,7 +90,7 @@ print('lizard initial position', lizard)
 # strings = ['t', 'tt', 'ttt', 'tttt']
 # strings = ['ata', 'atta', 'attta', 'atttta']
 strings = ['tpptpaatattt']
-# strings = ['attatpatatptatta']
+#strings = ['attatpatatptatta']
 #strings = ['']
 # apply
 t0 = time()
@@ -131,7 +136,7 @@ for k, string in enumerate(strings):
     mesh = CoarsePseudoQuadMesh.from_vertices_and_faces(*mesh0.to_vertices_and_faces())
     # tail, body, head = add_strip_lizard_2(mesh, lizard, string)
     tail, body, head = lizard_atp(mesh, lizard, string)
-    
+    final_lizard = (tail, body, head)
     poles = []
     for fkey in mesh.faces():
         fv = mesh.face_vertices(fkey)
@@ -153,7 +158,7 @@ for k, string in enumerate(strings):
         HERE = os.path.dirname(__file__)
         FILE = os.path.join(HERE, 'data/{}_{}.json'.format(input_mesh_refinement, string))
         mesh_json = Mesh.from_vertices_and_faces(*mesh.to_vertices_and_faces())
-        mesh_json.to_json('C:/Users/footb/Desktop/Thesis/String-RL/Output/RL-attempt-01/{}.trial.json'.format(string))
+        mesh_json.to_json('C:/Users/footb/Desktop/Thesis/String-RL/Output/meaningful/{}.oval.json'.format(string))
 
     # geometry and density processing
     if postprocess:
@@ -165,14 +170,6 @@ for k, string in enumerate(strings):
             mesh.densification()
             mesh = mesh.dense_mesh()
             postprocessing(mesh)
-    
-    # categorize vertices 
-    try:
-        mesh_features = MeshFeature(mesh)
-        categorized_vertices = mesh_features.categorize_vertices(display_vertices=False)
-        categorized_vertices_all_meshes[string] = categorized_vertices
-    except TypeError as e:
-        print(f"Error in categorizing vertices for mesh {string}: {e}")
 
     mesh2string[mesh] = string
 
@@ -197,11 +194,26 @@ else:
 
 if view:
     mash = Mesh.from_json(terminal_mesh_json_path)
-    print(mash)
     mash1 = CoarsePseudoQuadMesh.from_vertices_and_faces(*mash.to_vertices_and_faces())
-    print(mash1)
     postprocessing(mash1)
-    viewer.scene.add(mash1)
+
+    mesh_features = MeshFeature(mash1, lizard=final_lizard)
+    results = mesh_features.categorize_vertices()
+    vertex_colors = results["vertex_colors"]
+    vertex_colors_dict = {key: color for key, color in vertex_colors.items()}
+    facecolor = {fkey:Color.white() for fkey in mesh.faces()}
+    linecolor = {ekey:Color.black() for ekey in mesh.edges()}
+    
+    viewer.scene.add(
+            mash1,
+            show_points=True,
+            use_vertexcolors=True,
+            facecolor=facecolor,
+            linecolor=linecolor,
+            pointcolor=vertex_colors_dict,
+            pointsize=1.0
+                     )
+    
     for mesh in mesh2string:
         viewer.scene.add(mesh)
     viewer.show()

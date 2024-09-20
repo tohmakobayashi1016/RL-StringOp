@@ -12,7 +12,7 @@ from compas.colors import Color
 from compas.geometry import Scale, Translation
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from Classes.feature_extraction import MeshFeature
+from Classes.feature_extraction_histogram_version import MeshFeature
 
 def postprocessing(mesh):
 

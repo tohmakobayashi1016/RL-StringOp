@@ -9,8 +9,9 @@ from compas_fd.solvers import fd_numpy
 from compas_viewer.viewer import Viewer
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from Classes.feature_extraction_lizard_position import MeshFeature
+from Classes.feature_extraction_histogram_version import MeshFeature
 from compas.colors import Color
+
 
 
 # custom postprocessing function
@@ -48,11 +49,13 @@ def postprocessing(mesh):
 input_mesh_refinement = 2  # densify the input 1-face quad mesh
 output_mesh_refinement = 1  # densify the ouput quad mesh
 
-postprocess = True
+postprocess = False
 densify = True
 array = False
 view = True
 export_json = True
+
+log_file = r'C:\Users\footb\Desktop\Thesis\String-RL\RL-StringOp\training_log_exp_ver.csv'
 
 ### intialise ###
 
@@ -85,9 +88,13 @@ print('lizard initial position', lizard)
 
 # produce strings
 # strings = ['t', 'tt', 'ttt', 'tttt']
-# strings = ['ata', 'atta', 'attta', 'atttta']
-strings = ['ttapttaaptpt']
+strings = ['tatpa']
+#strings = ['tpptpaatattt']
 # strings = ['attatpatatptatta']
+
+#From data
+#data = pd.read_csv(log_file)
+#strings = data['actions'].tolist()
 
 # apply
 t0 = time()
@@ -95,48 +102,54 @@ mesh2string = {}
 for k, string in enumerate(strings):
     print(string)
 
-    # modifiy topology
-    mesh = CoarsePseudoQuadMesh.from_vertices_and_faces(*mesh0.to_vertices_and_faces())
-    # tail, body, head = add_strip_lizard_2(mesh, lizard, string)
-    tail, body, head = lizard_atp(mesh, lizard, string)
-    final_lizard = (tail, body, head)
-    print('Final lizard position', final_lizard)
+    try:
+        # modifiy topology
+        mesh = CoarsePseudoQuadMesh.from_vertices_and_faces(*mesh0.to_vertices_and_faces())
+        # tail, body, head = add_strip_lizard_2(mesh, lizard, string)
+        tail, body, head = lizard_atp(mesh, lizard, string)
+        final_lizard = (tail, body, head)
+        print('Final lizard position', final_lizard)
 
-    poles = []
-    for fkey in mesh.faces():
-        fv = mesh.face_vertices(fkey)
-        if len(fv) == 3:
-            if body in fv:
-                poles.append(mesh.vertex_coordinates(body))
-            else:
-                # warn if pole missing
-                'pbm identification pole'
-                poles.append(mesh.vertex_coordinates(fv[0]))
-    
-    # warn if mesh not manifold
-    if not mesh.is_manifold():
-        print('mesh not manifold')
-        continue
+        poles = []
+        for fkey in mesh.faces():
+            fv = mesh.face_vertices(fkey)
+            if len(fv) == 3:
+                if body in fv:
+                    poles.append(mesh.vertex_coordinates(body))
+                else:
+                    # warn if pole missing
+                    'pbm identification pole'
+                    poles.append(mesh.vertex_coordinates(fv[0]))
+        
+        # warn if mesh not manifold
+        if not mesh.is_manifold():
+            print('mesh not manifold')
+            continue
 
-    # export JSON
-    if export_json:
-        HERE = os.path.dirname(__file__)
-        FILE = os.path.join(HERE, 'data/{}_{}.json'.format(input_mesh_refinement, string))
-        mesh_json = Mesh.from_vertices_and_faces(*mesh.to_vertices_and_faces())
-        mesh_json.to_json('C:/Users/footb/Desktop/Thesis/String-RL/Output/RL-debug-record/json/10.visualizer.{}.json'.format(string))
+        # export JSON
+        if export_json:
+            HERE = os.path.dirname(__file__)
+            FILE = os.path.join(HERE, 'data/{}_{}.json'.format(input_mesh_refinement, string))
+            mesh_json = Mesh.from_vertices_and_faces(*mesh.to_vertices_and_faces())
+            mesh_json.to_json('C:/Users/footb/Desktop/Thesis/String-RL/Output/meaningful/{}.json'.format(string))
 
-    # geometry and density processing
-    if postprocess:
-        postprocessing(mesh)
-        if densify:
-            mesh = CoarsePseudoQuadMesh.from_vertices_and_faces_with_poles(*mesh.to_vertices_and_faces(), poles=poles)
-            mesh.collect_strips()
-            mesh.strips_density(output_mesh_refinement)
-            mesh.densification()
-            mesh = mesh.dense_mesh()
+        # geometry and density processing
+        if postprocess:
             postprocessing(mesh)
+            if densify:
+                mesh = CoarsePseudoQuadMesh.from_vertices_and_faces_with_poles(*mesh.to_vertices_and_faces(), poles=poles)
+                mesh.collect_strips()
+                mesh.strips_density(output_mesh_refinement)
+                mesh.densification()
+                mesh = mesh.dense_mesh()
+                postprocessing(mesh)
 
-    mesh2string[mesh] = string
+        mesh2string[mesh] = string
+    
+    except ValueError as ve:
+        print(f"Skipping invalid string {string}: {ve}")
+    except Exception as e:
+        print(f"An unexpected error occurred with string {string}: {e}")
 
 # results
 t1 = time()
@@ -148,10 +161,15 @@ if array:
         n2 = int(n ** 0.5)
         i = int(k / n2)
         j = int(k % n2)
+        #k = int(k / n2)
         mesh.move([1.5 * (i + 1), 1.5 * (j + 1), 0.0])
+        #mesh.move([0.0,0.0, k])
+        
 else:
     for k, mesh in enumerate(mesh2string):
         mesh.move([1.5 * (k + 1), 0.0, 0.0])
+        #mesh.move([0.0,0.0, k])
+        pass
 
 if view:
     for mesh in mesh2string:
@@ -165,7 +183,7 @@ if view:
         viewer.scene.add(
             mesh,
             show_points=True,
-            use_vertexcolors=False,
+            use_vertexcolors=True,
             facecolor=facecolor,
             linecolor=linecolor,
             pointcolor=vertex_colors_dict,
