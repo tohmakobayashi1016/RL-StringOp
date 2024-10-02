@@ -142,8 +142,7 @@ class EpisodeLoggingCallback(BaseCallback):
             self.actions = []  # Reset the actions list for the next episode
 
         return True
-
-    
+  
 class StopTrainingOnEpisodesCallback(BaseCallback):
     def __init__(self, num_episodes: int, verbose=0):
         super(StopTrainingOnEpisodesCallback, self).__init__(verbose) #Maybe I can also checkout StopTrainingOnRewardCallBack
@@ -177,7 +176,7 @@ initial_mesh = coarse.dense_mesh()
 initial_mesh.collect_strips()
 
 # Path to the terminal mesh JSON file
-terminal_mesh_json_path = r'C:\Users\footb\Desktop\Thesis\String-RL\Output\meaningful\atta.json'
+terminal_mesh_json_path = r'C:\Users\footb\Desktop\Thesis\String-RL\Output\meaningful\atpta.json'
 
 # Initialize environment
 env = MeshEnvironment(initial_mesh, terminal_mesh_json_path, max_steps = 5)
@@ -206,7 +205,7 @@ with open(episode_log_file, 'w') as f:
 num_design_episodes = 10000
 observation_callback = ObservationCallback(log_file=log_file)
 stop_callback = StopTrainingOnEpisodesCallback(num_episodes=num_design_episodes)
-reward_callback = StopTrainingOnRewardThreshold(reward_threshold=300, verbose=1) #check implementation
+reward_callback = StopTrainingOnRewardThreshold(reward_threshold=400, verbose=1) #check implementation
 eval_callback = EvalCallback(env, callback_on_new_best=reward_callback, eval_freq=1000, verbose=1) #check implementation
 episode_logging_callback = EpisodeLoggingCallback(log_file=episode_log_file)
 
@@ -227,6 +226,6 @@ elapsed_time = time.time() - start_time
 print(f"Elapsed time for {num_design_episodes} episodes: {elapsed_time:.2f} seconds")
 
 # Save the model
-model.save("dqn_mesh_graph_disregard")
+model.save("DQN_simplified_model")
 
 

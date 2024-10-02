@@ -165,7 +165,7 @@ class MeshEnvironment(gym.Env):
         time_step_penalty = -5.0
 
         # Define the terminal string
-        terminal_string = 'atta' # Examplle target string
+        terminal_string = 'atpta' # Examplle target string
 
         # Matching action reward
         action_string = ''.join(self.action_string)
@@ -211,7 +211,7 @@ class MeshEnvironment(gym.Env):
         # Calculate Levenshtein and mesh distances
         current_string = [''.join(self.action_string)]
         #print(f" Action String: {current_string}")
-        terminal_string = ['atta'] # Target string
+        terminal_string = ['atpta'] # Target string
         levenshtein_distance = self.distance_calc.levenshtein_distance(current_string, terminal_string)[0]
         #print(f"Levenshtein distance: {levenshtein_distance}")
         mesh_distance = self.distance_calc.mesh_distance(current_string, terminal_string)[0]

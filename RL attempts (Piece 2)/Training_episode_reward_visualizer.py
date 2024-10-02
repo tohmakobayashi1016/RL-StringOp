@@ -6,7 +6,7 @@ from stable_baselines3 import DQN
 
 # Path to the episode log file
 log_file = r'C:\Users\footb\Desktop\Thesis\String-RL\RL-StringOp\episode_rewards_log.csv'
-model = DQN.load(r'C:\Users\footb\Desktop\Thesis\String-RL\RL-StringOp\dqn_mesh_graph_disregard')
+model = DQN.load(r'C:\Users\footb\Desktop\Thesis\String-RL\RL-StringOp\DQN_simplified_model')
 
 # Load the CSV file
 data = pd.read_csv(log_file)

@@ -88,7 +88,7 @@ print('lizard initial position', lizard)
 
 # produce strings
 # strings = ['t', 'tt', 'ttt', 'tttt']
-strings = ['attap']
+strings = ['atpta']
 #strings = ['tpptpaatattt']
 # strings = ['attatpatatptatta']
 
