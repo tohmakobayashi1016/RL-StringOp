@@ -164,13 +164,23 @@ class MeshEnvironment(gym.Env):
         # Time-step penalty
         time_step_penalty = -5.0
 
+        # Define the terminal string
+        terminal_string = 'atta' # Examplle target string
+
+        # Matching action reward
+        action_string = ''.join(self.action_string)
+        matching_reward = 0
+        for i, action_char in enumerate(action_string):
+            if i < len(terminal_string) and action_char == terminal_string[i]:
+                matching_reward += 50
+
         # Total reward: negative MSE + time-step penalty + distance reward
-        reward = -mse + time_step_penalty + distance_reward
+        reward = -mse + time_step_penalty + distance_reward + matching_reward
 
         # Additional reward for reaching terminal state
         if done:
             print("Terminal state reached, adding large positive reward")
-            reward += 305
+            reward += 205
         return reward
     
     def is_terminal_state(self):

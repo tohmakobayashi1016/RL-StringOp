@@ -10,9 +10,9 @@ import pandas as pd
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),'..')))
 from Classes.FormatConverter import FormatConverter
 
-class LoggingCallback(BaseCallback):
+class ObservationCallback(BaseCallback):
     def __init__(self, log_file, verbose=0):
-        super(LoggingCallback, self).__init__(verbose)
+        super(ObservationCallback, self).__init__(verbose)
         self.log_file = log_file
         self.episode_rewards = []
         self.episode_lengths = []
@@ -94,6 +94,55 @@ class LoggingCallback(BaseCallback):
 
         return True
 
+class EpisodeLoggingCallback(BaseCallback):
+    def __init__(self, log_file, verbose=0):
+        super(EpisodeLoggingCallback, self).__init__(verbose)
+        self.log_file = log_file
+        self.episode_rewards = []
+        self.episode_lengths = []
+        self.episode_strings = []  # To store the full action string at the end of each episode
+        self.actions = []  # List to store actions taken in the current episode
+        self.episode_reward = 0
+        self.episode_length = 0
+        self.format_converter = FormatConverter()
+
+    def _on_step(self) -> bool:
+        # Access actions, rewards, and done flags from self.locals
+        action = self.locals.get("actions", None)
+        reward = self.locals.get("rewards", None)
+        done = self.locals.get("dones", None)
+
+        # Ensure actions and rewards are available
+        if action is None or reward is None:
+            print("Warning: 'actions' or 'rewards' not available in self.locals")
+            return True  # Continue training
+
+        # Convert action to action letter and append to the actions list
+        action_letter = self.training_env.envs[0].format_converter.from_discrete_to_letter([int(action[0])])
+        self.actions.append(action_letter)  # Append to the current action list
+
+        # Accumulate reward and episode length
+        self.episode_reward += reward[0]
+        self.episode_length += 1
+
+        # If the episode is done, log the results
+        if done[0]:
+            # Join the list of actions to create the full action string
+            full_action_string = ''.join(self.actions)
+            with open(self.log_file, 'a') as f:
+                # Log episode length, reward, full action string, and the length of the action string
+                f.write(f"{self.episode_length},{self.episode_reward},{full_action_string}\n")
+
+            # Reset for the next episode
+            self.episode_rewards.append(self.episode_reward)
+            self.episode_lengths.append(self.episode_length)
+            self.episode_strings.append(full_action_string)  # Store the final action string
+            self.episode_reward = 0
+            self.episode_length = 0
+            self.actions = []  # Reset the actions list for the next episode
+
+        return True
+
     
 class StopTrainingOnEpisodesCallback(BaseCallback):
     def __init__(self, num_episodes: int, verbose=0):
@@ -144,20 +193,25 @@ model = DQN('MultiInputPolicy',
 
 # Log file path
 log_file = 'observation_history.csv'
+episode_log_file = 'episode_rewards_log.csv'
 
 # Initialize the log file (with headers)
 with open(log_file, 'w') as f:
     f.write('step,degree_2,degree_3,degree_4,degree_5,degree_6_plus,levenshtein_distance,mesh_distance,action,action_letters,reward\n')
 
+with open(episode_log_file, 'w') as f:
+    f.write('episode_length,episode_reward,action_string\n')
+
 # Initialize callbacks
 num_design_episodes = 10000
-logging_callback = LoggingCallback(log_file=log_file)
+observation_callback = ObservationCallback(log_file=log_file)
 stop_callback = StopTrainingOnEpisodesCallback(num_episodes=num_design_episodes)
-reward_callback = StopTrainingOnRewardThreshold(reward_threshold=0.9, verbose=1) #check implementation
+reward_callback = StopTrainingOnRewardThreshold(reward_threshold=300, verbose=1) #check implementation
 eval_callback = EvalCallback(env, callback_on_new_best=reward_callback, eval_freq=1000, verbose=1) #check implementation
+episode_logging_callback = EpisodeLoggingCallback(log_file=episode_log_file)
 
 # Combine callbacks
-callback = CallbackList([logging_callback, stop_callback, reward_callback, eval_callback])
+callback = CallbackList([observation_callback, episode_logging_callback, stop_callback, reward_callback, eval_callback])
 
 #Start profiling
 start_time = time.time()
