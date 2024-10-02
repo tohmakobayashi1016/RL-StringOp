@@ -2,7 +2,7 @@ import numpy as np
 import gymnasium as gym
 from gymnasium.spaces import Box, Discrete, Dict
 import sys, os, json
-from math import pi, cos, sin
+from math import pi, cos, sin, sqrt
 from compas_viewer.viewer import Viewer
 
 from compas.datastructures import Mesh
@@ -12,9 +12,10 @@ from compas_fd.solvers import fd_numpy
 from compas.colors import Color
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from Classes.feature_extraction_histogram_version import MeshFeature
+from Classes.feature_extraction_histogram_granular import MeshFeature
 from Classes.FormatConverter import FormatConverter
 from Classes.PostProcessor import PostProcessor
+from Classes.distance_functions import DistanceFunctions
 
 class MeshEnvironment(gym.Env):
     def __init__(self, initial_mesh, terminal_mesh_json_path, max_steps=5, max_vertices=50):
@@ -23,11 +24,12 @@ class MeshEnvironment(gym.Env):
         #Initialize classes
         self.format_converter  = FormatConverter()
         self.post_processor    = PostProcessor()
+        self.distance_calc     = DistanceFunctions()
         
         #Initialize mesh and terminal state
         self.initial_mesh      = initial_mesh
         self.terminal_mesh     = self.load_terminal_mesh(terminal_mesh_json_path)
-        self.terminal_histogram, _ = MeshFeature(self.terminal_mesh).categorize_vertices()
+        self.terminal_histogram = MeshFeature(self.terminal_mesh).categorize_vertices()
 
         #Separate initial mesh for modification and current mesh for tracking state
         self.initial_mesh_copy = CoarsePseudoQuadMesh.from_vertices_and_faces(*initial_mesh.to_vertices_and_faces())
@@ -38,17 +40,8 @@ class MeshEnvironment(gym.Env):
         self.action_string     = [''] 
         
         # Define observation space using Dict
-        self.max_vertices = max_vertices
-        self.node_space = Box(low=-np.inf, high=np.inf, shape=(max_vertices, 3), dtype=np.float32)
-        self.edge_index_space = Box(low=0, high=max_vertices, shape=(max_vertices * 4, 2), dtype=np.int32)
-        self.edge_attr_space = Box(low=0, high=1, shape=(max_vertices * 4, 2), dtype=np.float32)
-        self.face_space = Box(low=0, high=max_vertices, shape=(max_vertices*2, 4), dtype=np.int32)
-        self.observation_space = Dict({
-            "vertices": self.node_space,
-            "edge_index": self.edge_index_space,
-            "edge_attr": self.edge_attr_space,
-            "faces": self.face_space
-        })
+        self.max_vertices      = max_vertices
+        self.create_observation_space()
 
         #Initialize compas parameters
         self.lizard            = self.position_lizard(self.initial_mesh_copy)
@@ -66,6 +59,28 @@ class MeshEnvironment(gym.Env):
         self.episode_number    = 0
    
         print("Environment initialized.")
+    
+    def create_observation_space(self):
+        #Topological features
+        self.vertex_degree_histogram_space = Box(low=0, high=self.max_vertices, shape=(5,), dtype=np.int32)
+        #Geometrical features
+        self.node_space = Box(low=-np.inf, high=np.inf, shape=(self.max_vertices, 3), dtype=np.float32)
+        self.edge_index_space = Box(low=0, high=self.max_vertices, shape=(self.max_vertices * 4, 2), dtype=np.int32)
+        self.edge_attr_space = Box(low=0, high=1, shape=(self.max_vertices * 4, 2), dtype=np.float32)
+        self.face_space = Box(low=0, high=self.max_vertices, shape=(self.max_vertices*2, 4), dtype=np.int32)
+        #distance features
+        self.levenshtein_distance = Box(low=0, high=np.inf, shape=(1,), dtype=np.float32)
+        self.mesh_distance = Box(low=0, high=np.inf, shape=(1,), dtype=np.float32)
+
+        self.observation_space = Dict({
+            "vertices": self.node_space,
+            "edge_index": self.edge_index_space,
+            "edge_attr": self.edge_attr_space,
+            "faces": self.face_space,
+            "degree_histogram": self.vertex_degree_histogram_space,
+            "levenshtein_distance": self.levenshtein_distance,
+            "mesh_distance": self.mesh_distance,
+        })
 
     def load_terminal_mesh(self, json_path):
         print(f"Loading terminal mesh from {json_path}...")
@@ -121,8 +136,6 @@ class MeshEnvironment(gym.Env):
         self.copy_poles        = []
         self.current_poles     = []
 
-        #self.previous_lse = 100
-
         self.current_step = 0
         self.episode_number += 1
         print(f"Environment reset. Starting episode {self.episode_number}.")
@@ -147,28 +160,28 @@ class MeshEnvironment(gym.Env):
             print(f"Step {self.current_step}: Action string - {self.action_string[0]}")
 
             #Track consecutive 'a' selection
-            #if action_letter == 'a':
-                #self.a_count += 1
-                #self.p_count = 0
-                #self.t_count = 0
-                #self.d_count = 0
-            #elif action_letter == 'p':
-                #self.a_count = 0
-                #self.p_count += 1
-                #self.t_count = 0
-                #self.d_count = 0
-            #elif action_letter == 't':
-                #self.a_count = 0
-                #self.p_count = 0
-                #self.t_count += 1
-                #self.d_count = 0
+            if action_letter == 'a':
+                self.a_count += 1
+                self.p_count = 0
+                self.t_count = 0
+                self.d_count = 0
+            elif action_letter == 'p':
+                self.a_count = 0
+                self.p_count += 1
+                self.t_count = 0
+                self.d_count = 0
+            elif action_letter == 't':
+                self.a_count = 0
+                self.p_count = 0
+                self.t_count += 1
+                self.d_count = 0
                 
             #else:
                 #self.d_count = 1 #Reset counter when different action is applied
                 
             
-            #Penalize consecutive 'a' selection (9-18) NOT NEEDED FOR SIMPLIFIED MODEL
-            #penalty = self.penalize_repeated_actions()
+            #Penalize consecutive 'a' selection (9-18) NOT NEEDED FOR SIMPLIFIED MODEL?
+            penalty = self.penalize_repeated_actions()
             
             #Position lizard
             self.lizard = self.position_lizard(self.initial_mesh_copy)
@@ -179,7 +192,7 @@ class MeshEnvironment(gym.Env):
             if body is None or head is None:
                 print(f"Error: Invalid lizard state detected: tail={tail}, body={body}, head={head}")
                 #Handle the error
-                reward = -0.5
+                reward = -500
                 terminated = True
                 truncated = False
                 obs, _ = self.get_state()
@@ -209,7 +222,7 @@ class MeshEnvironment(gym.Env):
 
         except ValueError as e:
             print(f"Error: {e}")
-            reward = -0.5
+            reward = -500
             terminated = True
             truncated = False
             obs, _ = self.get_state()
@@ -219,6 +232,11 @@ class MeshEnvironment(gym.Env):
         #Get the current observation state and return results
         obs, _ = self.get_state()
         info = {}
+        #Debugging
+        print(f"Levenshtein Distance after action: {obs['levenshtein_distance'][0]}")
+        #levenshtein_distance = obs['levenshein_distance'][0]
+        print(f"Mesh Distance after action: {obs['mesh_distance'][0]}")
+        #mesh_distance = obs['mesh_distance'][0]
 
         #Reset initial_mesh_copy for next step
         self.initial_mesh_copy = CoarsePseudoQuadMesh.from_vertices_and_faces(*self.initial_mesh.to_vertices_and_faces())
@@ -227,32 +245,41 @@ class MeshEnvironment(gym.Env):
         return obs, reward, terminated, truncated, info
     
     def calculate_reward(self, done):
-        # Terminal and current vertex degree histograms
-        terminal_result = MeshFeature(self.terminal_mesh).categorize_vertices()
-        current_result = MeshFeature(self.current_mesh).categorize_vertices()
+        # Current vertex degree histograms
+        current_histogram = MeshFeature(self.current_mesh).categorize_vertices()
 
-        terminal_histogram = terminal_result['degree_histogram']
-        current_histogram = current_result['degree_histogram']
+        # Separated MSE
+        mse_degree_2 = np.mean((len(current_histogram['degree_2_vertices']) - len(self.terminal_histogram['degree_2_vertices']))**2)
+        mse_degree_3 = np.mean((len(current_histogram['degree_3_vertices']) - len(self.terminal_histogram['degree_3_vertices']))**2)
+        mse_degree_4 = np.mean((len(current_histogram['degree_4_vertices']) - len(self.terminal_histogram['degree_4_vertices']))**2)
+        mse_degree_5 = np.mean((len(current_histogram['degree_5_vertices']) - len(self.terminal_histogram['degree_5_vertices']))**2)
+        mse_degree_6_plus = np.mean((len(current_histogram['degree_6_plus_vertices']) - len(self.terminal_histogram['degree_6_plus_vertices']))**2)
 
         # Ensue both histograms contain numerical values by converting to integers
-        terminal_histogram = [int(t) for t in terminal_histogram]
-        current_histogram = [int(c) for c in current_histogram]
+        #terminal_histogram = [int(t) for t in terminal_histogram]
+        #current_histogram = [int(c) for c in current_histogram]
         
         # Calculate least squares error between terminal and current histograms
-        current_lse = sum((t-c)**2 for t,c in zip(terminal_histogram, current_histogram))
+        current_mse = mse_degree_2 + mse_degree_3 + mse_degree_4 + mse_degree_5 + mse_degree_6_plus
+        
+        #Just seeing if this works
+        obs, valid = self.get_state()
+        levenshtein_distance = obs['levenshtein_distance'][0]
+        mesh_distance = obs['mesh_distance'][0]
 
-        # Get the previouse LSE, if available
-        #previous_lse = getattr(self, 'previous_lse', 100)
+        distance_reward = -1*(levenshtein_distance + mesh_distance)**2
+
+        # end of distance checking
 
         # Time-step penalty
-        time_step_penalty = -2.0
+        time_step_penalty = -5.0
 
         # Total reward: negative LSE + time-step penalty
-        reward = -current_lse + time_step_penalty
+        reward = -current_mse + time_step_penalty + distance_reward #distance reward trial
         
         if done and self.is_terminal_state():
             print("Terminal state reached, adding large positive reward")
-            reward += 100
+            reward += 200
 
         return reward
 
@@ -318,21 +345,16 @@ class MeshEnvironment(gym.Env):
 
     def is_terminal_state(self):
         # Terminal and current vertex degree histograms
-        terminal_result = MeshFeature(self.terminal_mesh).categorize_vertices()
-        current_result  = MeshFeature(self.current_mesh).categorize_vertices()
-
-        terminal_histogram = terminal_result['degree_histogram']
-        current_histogram = current_result['degree_histogram']
+        current_histogram  = MeshFeature(self.current_mesh).categorize_vertices()
 
         # Compare histograms directly
-        if terminal_histogram == current_histogram:
-            print("Terminal state detected")
-            return True
-        else:
-            print("Vertex degree histograms do not match:")
-            print(f"Terminal: {terminal_histogram}")
-            print(f"Current: {current_histogram}")
-            return False
+        match_degree_2 = len(current_histogram['degree_2_vertices']) == len(self.terminal_histogram['degree_2_vertices'])
+        match_degree_3 = len(current_histogram['degree_3_vertices']) == len(self.terminal_histogram['degree_3_vertices'])
+        match_degree_4 = len(current_histogram['degree_4_vertices']) == len(self.terminal_histogram['degree_4_vertices'])
+        match_degree_5 = len(current_histogram['degree_5_vertices']) == len(self.terminal_histogram['degree_5_vertices'])
+        match_degree_6_plus = len(current_histogram['degree_6_plus_vertices']) == len(self.terminal_histogram['degree_6_plus_vertices'])
+
+        return match_degree_2 and match_degree_3 and match_degree_4 and match_degree_5 and match_degree_6_plus
     
     def get_state(self):
         #Information extraction
@@ -371,11 +393,38 @@ class MeshEnvironment(gym.Env):
             padding_faces = np.zeros((self.max_vertices*2 - faces.shape[0], 4), dtype=np.int32)
             faces = np.vstack((faces, padding_faces))    
 
+        # Compute the singulaity degree histogram for the current mesh
+        current_histogram = MeshFeature(self.current_mesh).categorize_vertices()
+        degree_histogram = np.array([
+            len(current_histogram['degree_2_vertices']),
+            len(current_histogram['degree_3_vertices']),
+            len(current_histogram['degree_4_vertices']),
+            len(current_histogram['degree_5_vertices']),
+            len(current_histogram['degree_6_plus_vertices'])
+        ], dtype=np.int32)
+
+        # Convert the current mesh state and terminal state into strings for distance calculations
+        current_string=[''.join(self.action_string)]
+        terminal_string = ['atta'] #True string, given
+
+        # Calculate Levenshtein and mesh distances
+        levenshtein_distance = self.distance_calc.levenshtein_distance(current_string, terminal_string)[0]
+        mesh_distance = self.distance_calc.mesh_distance(current_string, terminal_string)[0]
+
+        #Debugging
+        print(f"Action String: {current_string}")
+        print(f"Terminal String: {terminal_string}")
+        print(f"Levenshtein Distance: {levenshtein_distance}")
+        print(f"Mesh distance: {mesh_distance}")
+
         obs = {
             "vertices": vertices,
             "edge_index": edges,
             "edge_attr": edge_attr,
-            "faces": faces
+            "faces": faces,
+            "degree_histogram": degree_histogram,
+            "levenshtein_distance": np.array([levenshtein_distance], dtype=np.float32),
+            "mesh_distance": np.array([mesh_distance], dtype=np.float32),
         }
 
         return obs, True #Return a valid obs and a success flag
@@ -385,3 +434,34 @@ class MeshEnvironment(gym.Env):
         #Update the list of vertices based on the current mesh
         updated_vertices = {vkey: self.current_mesh.vertex_coordinates(vkey) for vkey in self.current_mesh.vertices()}
         self.current_mesh.update_default_vertex_attributes(updated_vertices)
+    
+    def calculate_reward_component(self, component):
+        """
+        Return the requested reward component.
+        """
+        # Current vertex degree histograms
+        current_histogram = MeshFeature(self.current_mesh).categorize_vertices()
+        mse_degree_2 = np.mean((len(current_histogram['degree_2_vertices']) - len(self.terminal_histogram['degree_2_vertices']))**2)
+        mse_degree_3 = np.mean((len(current_histogram['degree_3_vertices']) - len(self.terminal_histogram['degree_3_vertices']))**2)
+        mse_degree_4 = np.mean((len(current_histogram['degree_4_vertices']) - len(self.terminal_histogram['degree_4_vertices']))**2)
+        mse_degree_5 = np.mean((len(current_histogram['degree_5_vertices']) - len(self.terminal_histogram['degree_5_vertices']))**2)
+        mse_degree_6_plus = np.mean((len(current_histogram['degree_6_plus_vertices']) - len(self.terminal_histogram['degree_6_plus_vertices']))**2)
+        current_mse = mse_degree_2 + mse_degree_3 + mse_degree_4 + mse_degree_5 + mse_degree_6_plus
+
+        # Distance rewards
+        obs, valid = self.get_state()
+        levenshtein_distance = obs['levenshtein_distance'][0]
+        mesh_distance = obs['mesh_distance'][0]
+        distance_reward = -1 * (levenshtein_distance + mesh_distance)**2
+
+        # Time-step penalty
+        time_step_penalty = -5.0
+
+        if component == "mse":
+            return current_mse
+        elif component == "distance_reward":
+            return distance_reward
+        elif component == "time_step_penalty":
+            return time_step_penalty
+        else:
+            raise ValueError(f"Unknown reward component: {component}")

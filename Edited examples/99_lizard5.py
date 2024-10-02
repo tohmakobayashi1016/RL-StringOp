@@ -9,7 +9,7 @@ from compas_fd.solvers import fd_numpy
 from compas_viewer.viewer import Viewer
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from Classes.feature_extraction_histogram_version import MeshFeature
+from Classes.feature_extraction_histogram_granular import MeshFeature
 from compas.colors import Color
 
 
@@ -88,7 +88,7 @@ print('lizard initial position', lizard)
 
 # produce strings
 # strings = ['t', 'tt', 'ttt', 'tttt']
-strings = ['tatpa']
+strings = ['attap']
 #strings = ['tpptpaatattt']
 # strings = ['attatpatatptatta']
 
@@ -175,18 +175,19 @@ if view:
     for mesh in mesh2string:
         feature_extractor = MeshFeature(mesh, lizard=final_lizard)
         results = feature_extractor.categorize_vertices()
-        vertex_colors = results["vertex_colors"]
-        vertex_colors_dict = {key: color for key, color in vertex_colors.items()}
-        facecolor = {fkey:Color.white() for fkey in mesh.faces()}
-        linecolor = {ekey:Color.black() for ekey in mesh.edges()}
+        print(results)
+        #vertex_colors = results["vertex_colors"]
+        #vertex_colors_dict = {key: color for key, color in vertex_colors.items()}
+        #facecolor = {fkey:Color.white() for fkey in mesh.faces()}
+        #linecolor = {ekey:Color.black() for ekey in mesh.edges()}
 
         viewer.scene.add(
             mesh,
-            show_points=True,
-            use_vertexcolors=True,
-            facecolor=facecolor,
-            linecolor=linecolor,
-            pointcolor=vertex_colors_dict,
-            pointsize=1.0
+            #show_points=True,
+            #use_vertexcolors=True,
+            #facecolor=facecolor,
+            #linecolor=linecolor,
+            #pointcolor=vertex_colors_dict,
+            #pointsize=1.0
             )
     viewer.show()

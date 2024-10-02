@@ -22,7 +22,9 @@ obs_input = {
     'edge_attr': torch.tensor(obs['edge_attr'], dtype=torch.float32),
     'edge_index': torch.tensor(obs['edge_index'], dtype=torch.float32),
     'faces': torch.tensor(obs['faces'], dtype=torch.float32),
-    'degree_histogram': torch.tensor(obs.get('degree_histogram', torch.zeros(1)), dtype=torch.float32)
+    'degree_histogram': torch.tensor(obs.get('degree_histogram', torch.zeros(1)), dtype=torch.float32),
+    'levenshtein_distance': torch.tensor(obs.get('levenshtein_distance', torch.zeros(1)), dtype=torch.float32),
+    'mesh_distance': torch.tensor(obs.get('mesh_distance', torch.zeros(1)), dtype=torch.float32)
 }
 
 # Now pass the dictionary to the q_net
@@ -72,18 +74,16 @@ plt.title('Action Frequency')
 plt.xlabel('Action')
 plt.ylabel('Count')
 
-# Plot action sequences as a color-coded matrix
+# Plot Levenshtein and Mesh distances instead of action sequences
 plt.subplot(3, 2, 4)
-action_matrix = data['actions'].apply(lambda x: [ord(a) - ord('a') for a in x])  # Convert actions to numerical representation
-max_length = action_matrix.apply(len).max()  # Get the max length of action sequences for padding
-action_matrix = pd.DataFrame(action_matrix.tolist()).fillna(-1).astype(int)  # Pad with -1 for missing actions
-
-# Display the action matrix as an image (each episode is a row, each action is a column)
-plt.imshow(action_matrix, cmap='Set3', aspect='auto')
-plt.colorbar(label='Action Code')  # Add colorbar to represent the action codes
-plt.title('Action Sequences per Episode')
-plt.xlabel('Action Step')
-plt.ylabel('Episode')
+plt.plot(data['current_mse'], label='Current MSE', color='blue')
+plt.plot(data['distance_reward'], label='Distance Reward', color='orange')
+plt.plot(data['time_step_penalty'], label='Time Step Penalty', color='red')
+plt.title('Reward Components Over Time')
+plt.xlabel('Episode')
+plt.ylabel('Values')
+plt.grid(True)
+plt.legend()
 
 # Example: plotting rewards from the replay buffer
 plt.subplot(3,2,5)

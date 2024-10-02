@@ -2,7 +2,7 @@ from stable_baselines3 import DQN
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold, BaseCallback, CallbackList
 from compas_quad.datastructures import CoarsePseudoQuadMesh
-from Environment_attempt08 import MeshEnvironment
+from Environment_attempt09_dummy_check import MeshEnvironment
 from compas_viewer import Viewer
 
 import sys, os, time
@@ -16,6 +16,9 @@ class LoggingCallback(BaseCallback):
         self.episode_rewards = []
         self.episode_lengths = []
         self.actions = []
+        self.mse_list = []
+        self.distance_reward_list = []
+        self.time_step_penalty_list = []
         self.episode_reward = 0
         self.episode_length = 0
         self.episode_number = 0
@@ -31,19 +34,33 @@ class LoggingCallback(BaseCallback):
         self.format_converter = FormatConverter()
         action_letter = self.training_env.envs[0].format_converter.from_discrete_to_letter([int(action)])
         self.actions.append(action_letter)
+
+        env = self.training_env.envs[0]
+        current_mse = env.calculate_reward_component("mse")
+        distance_reward = env.calculate_reward_component("distance_reward")
+        time_step_penatly = env.calculate_reward_component("time_step_penalty")
+
+        self.mse_list.append(current_mse)
+        self.distance_reward_list.append(distance_reward)
+        self.time_step_penalty_list.append(time_step_penatly)
         
         print(f"Action taken: {action_letter}")
 
+        # If episode is done, log the episode details
         if done:
             self.episode_number += 1
             print(f"Episode {self.episode_number} finished.")
+
             self.episode_rewards.append(self.episode_reward)
             self.episode_lengths.append(self.episode_length)
             with open(self.log_file, 'a') as f:
-                f.write(f"{self.episode_reward},{self.episode_length},{''.join(self.actions)}\n")
+                f.write(f"{self.episode_reward},{self.episode_length},{''.join(self.actions)},{current_mse},{distance_reward},{time_step_penatly}\n")
             self.episode_reward = 0
             self.episode_length = 0
             self.actions = []
+            self.mse_list = []
+            self.distance_reward_list = []
+            self.time_step_penalty_list = []
         return True
 
 class StopTrainingOnEpisodesCallback(BaseCallback):
@@ -98,7 +115,7 @@ log_file = 'training_log_disregard.csv'
 
 #Initialize the log file
 with open(log_file, 'w') as f:
-    f.write('reward,length,actions\n')
+    f.write('reward,length,actions,current_mse,distance_reward,time_step_penalty\n')
 
 #Initialize callbacks
 number_of_design_episode = 1000

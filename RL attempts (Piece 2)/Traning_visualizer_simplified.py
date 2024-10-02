@@ -18,11 +18,9 @@ actions = replay_buffer.actions
 rewards = replay_buffer.rewards
 
 obs_input = {
-    'vertices': torch.tensor(obs['vertices'], dtype=torch.float32),
-    'edge_attr': torch.tensor(obs['edge_attr'], dtype=torch.float32),
-    'edge_index': torch.tensor(obs['edge_index'], dtype=torch.float32),
-    'faces': torch.tensor(obs['faces'], dtype=torch.float32),
-    'degree_histogram': torch.tensor(obs.get('degree_histogram', torch.zeros(1)), dtype=torch.float32)
+    'degree_histogram': torch.tensor(obs.get('degree_histogram', torch.zeros(1)), dtype=torch.float32),
+    'levenshtein_distance': torch.tensor(obs.get('levenshtein_distance', torch.zeros(1)), dtype=torch.float32),
+    'mesh_distance': torch.tensor(obs.get('mesh_distance', torch.zeros(1)), dtype=torch.float32)
 }
 
 # Now pass the dictionary to the q_net
@@ -33,7 +31,7 @@ data = pd.read_csv(log_file)
 print(data.head())
 
 # Convert 'actions' from strings to lists of individual characters
-data['actions'] = data['actions'].apply(lambda x: list(x))
+#data['actions'] = data['actions'].apply(lambda x: list(x))
 
 # Create a figure
 plt.figure(figsize=(18, 12))
@@ -61,43 +59,42 @@ plt.ylabel('Length')
 plt.grid(True)
 plt.legend()
 
-# Plot action frequency heatmap
+# Plot Levenshtein and Mesh distances
 plt.subplot(3, 2, 3)
-all_actions = pd.Series([action for sublist in data['actions'] for action in sublist])
-action_counts = all_actions.value_counts().sort_index()  # Sort by action for better visualization
+plt.plot(data['levenshtein_distance'], label='Levenshtein Distance', color='blue')
+plt.plot(data['mesh_distance'], label='Mesh Distance', color='red')
+plt.title('Levenshtein and Mesh Distances Over Time')
+plt.xlabel('Episode')
+plt.ylabel('Distance')
+plt.grid(True)
+plt.legend()
 
-# Create a bar plot of action counts
-sns.barplot(x=action_counts.index, y=action_counts.values, hue=action_counts.index, palette='viridis', legend=False)
-plt.title('Action Frequency')
-plt.xlabel('Action')
-plt.ylabel('Count')
-
-# Plot action sequences as a color-coded matrix
-plt.subplot(3, 2, 4)
-action_matrix = data['actions'].apply(lambda x: [ord(a) - ord('a') for a in x])  # Convert actions to numerical representation
-max_length = action_matrix.apply(len).max()  # Get the max length of action sequences for padding
-action_matrix = pd.DataFrame(action_matrix.tolist()).fillna(-1).astype(int)  # Pad with -1 for missing actions
-
-# Display the action matrix as an image (each episode is a row, each action is a column)
-plt.imshow(action_matrix, cmap='Set3', aspect='auto')
-plt.colorbar(label='Action Code')  # Add colorbar to represent the action codes
-plt.title('Action Sequences per Episode')
-plt.xlabel('Action Step')
-plt.ylabel('Episode')
-
-# Example: plotting rewards from the replay buffer
-plt.subplot(3,2,5)
+# Plot rewards from the replay buffer
+plt.subplot(3,2,4)
 plt.plot(rewards)
 plt.title('Rewards from Replay Buffer')
 plt.xlabel('Timestep')
 plt.ylabel('Reward')
 
 # Visualize the Q-values for each action
-plt.subplot(3,2,6)
+plt.subplot(3,2,5)
 plt.plot(q_values.detach().numpy())
 plt.title('Q-values for Different Actions')
 plt.xlabel('Observation Index')
 plt.ylabel('Q-value')
+
+# Plot action frequency heatmap
+plt.subplot(3, 2, 6)
+
+# Assuming actions are lists or sequences logged as strings in CSV; if not, adjust how you log them
+all_actions = pd.Series([action for sublist in data['actions'] for action in sublist])
+action_counts = all_actions.value_counts().sort_index()  # Sort by action for better visualization
+
+# Create a bar plot of action counts
+sns.barplot(x=action_counts.index, y=action_counts.values, palette='viridis', dodge=False)
+plt.title('Action Frequency')
+plt.xlabel('Action')
+plt.ylabel('Count')
 
 # Adjust layout and display the plots
 plt.tight_layout()
