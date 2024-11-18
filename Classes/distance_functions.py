@@ -51,31 +51,46 @@ class DistanceFunctions:
         
         return distances
 
-    def count_a_pairs(self, string):
+    def count_a_pairs(self, string_list):
         """
-        Count the number of valid non-overlapping pairs of 'a' characters in a string.
-        A valid pair consists of any two 'a' characters, either adjacent or separated
-        by any number of characters, but once a pair is found, those positions are ignored.
-
-        Args:
-        string (str): The input string.
+       Args:
+        string_list (list): List of strings.
 
         Returns:
-        int: The number of valid non-overlapping 'a' pairs.
+        float: The total number of valid non-overlapping 'a' pairs across all strings plus 0.2
+            for every character between the 'a's.
         """
-        # Find all positions of 'a' characters in the string
-        a_positions = [i for i, char in enumerate(string) if char == 'a']
-        
-        # Count non-overlapping pairs
-        count = 0
-        i = 0
-        while i < len(a_positions) - 1:
-            # If we find a valid pair, we skip the next position (non-overlapping)
-            count += 1
-            i += 2  # Move by 2 to ensure we don't overlap the pair
-        
-        return count
+        total_count = 0.0  # Initialize total count as a float
 
+        for string in string_list:
+            # Find all positions of 'a' characters in the current string
+            a_positions = [i for i, char in enumerate(string) if char == 'a']
+
+            # Initialize the count for this string
+            count = 0.0
+            i = 0
+            while i < len(a_positions) - 1:
+                # Check characters between the current 'a' and the next 'a'
+                between = string[a_positions[i] + 1 : a_positions[i + 1]]
+
+                # Check if the pair is valid (at least one character between, and not all 'p')
+                if len(between) > 0 and not all(c == 'p' for c in between):
+                    # Add 1 for the valid pair
+                    count += 1
+                    
+                    # Add 0.2 for each character between (including 'p')
+                    count += len(between) * 0.2
+                    
+                    # Move by 2 to ensure non-overlapping pairs
+                    i += 2
+                else:
+                    # If an invalid pair is found, stop further counting
+                    break
+
+            # Add this string's count to the total
+            total_count += count
+
+        return total_count
 
     def mesh_distance(self, list1, list2):
         """
@@ -114,11 +129,17 @@ class DistanceFunctions:
 #distance_calculator = DistanceFunctions()
 
 # Example strings for Levenshtein distance
-#list1 = ['apppa']
-#list2 = ['atta']
-#levenshtein_distances = distance_calculator.levenshtein_distance(list1, list2)
-#print("Levenshtein Distances:", levenshtein_distances)
+#list1 = ['tt', 'atpta']
 
-# Example strings for Mesh distance
-#mesh_distances = distance_calculator.mesh_distance(list1, list2)
-#print("Mesh Distances:", mesh_distances)
+#print(distance_calculator.count_a_pairs(list1))
+
+
+#list2 = ['a']
+#list3 = ['p']
+#list4 = ['t']
+#list5 = ['at']
+#print(distance_calculator.levenshtein_distance(list2, list5))
+#print(distance_calculator.levenshtein_distance(list3, list5))
+#print(distance_calculator.levenshtein_distance(list4, list5))
+
+

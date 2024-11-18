@@ -34,7 +34,7 @@ def postprocessing(mesh):
     edges = [(key2index[u], key2index[v]) for u, v in mesh.edges()]
     fixed = [key2index[vkey] for vkey in fixed]
     q = [1.0] * len(edges)
-    loads = [[0.0, 0.0, 1.0 / len(vertices)]] * len(vertices)
+    loads = [[0.0, 0.0, 2.5 / len(vertices)]] * len(vertices)
     result = fd_numpy(vertices=vertices, edges=edges, fixed=fixed, forcedensities=q, loads=loads)
     xyz = result.vertices
     for i, (x, y, z) in enumerate(xyz):
@@ -47,13 +47,13 @@ def postprocessing(mesh):
 ### parameters ###
 
 input_mesh_refinement = 2  # densify the input 1-face quad mesh
-output_mesh_refinement = 1  # densify the ouput quad mesh
+output_mesh_refinement = 6  # densify the ouput quad mesh
 
 postprocess = True
-densify = True
+densify = False
 array = False
 view = True
-export_json = False
+export_json = True
 
 log_file = r'C:\Users\footb\Desktop\Thesis\String-RL\RL-StringOp\training_log_exp_ver.csv'
 
@@ -88,8 +88,8 @@ print('lizard initial position', lizard)
 
 # produce strings
 # strings = ['t', 'tt', 'ttt', 'tttt']
-# strings = ['ata', 'atta', 'attta', 'atttta']
-strings = ['tpptpaatattt']
+strings = ['atat', 'atap', 'atpa', 'apta', 'tata','pata']
+# strings = ['tpptpaatattt']
 #strings = ['attatpatatptatta']
 #strings = ['']
 # apply
@@ -158,7 +158,7 @@ for k, string in enumerate(strings):
         HERE = os.path.dirname(__file__)
         FILE = os.path.join(HERE, 'data/{}_{}.json'.format(input_mesh_refinement, string))
         mesh_json = Mesh.from_vertices_and_faces(*mesh.to_vertices_and_faces())
-        mesh_json.to_json('C:/Users/footb/Desktop/Thesis/String-RL/Output/meaningful/{}.oval.json'.format(string))
+        mesh_json.to_json('C:/Users/footb/Desktop/Thesis/String-RL/Output/meaningful/{}.json'.format(string))
 
     # geometry and density processing
     if postprocess:

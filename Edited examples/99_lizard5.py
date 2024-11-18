@@ -88,7 +88,7 @@ print('lizard initial position', lizard)
 
 # produce strings
 # strings = ['t', 'tt', 'ttt', 'tttt']
-strings = ['atpta']
+strings = ['att','atta']
 #strings = ['tpptpaatattt']
 # strings = ['attatpatatptatta']
 
@@ -109,6 +109,7 @@ for k, string in enumerate(strings):
         tail, body, head = lizard_atp(mesh, lizard, string)
         final_lizard = (tail, body, head)
         print('Final lizard position', final_lizard)
+        print(f"Final position of lizard: {tail, body, head}")
 
         poles = []
         for fkey in mesh.faces():

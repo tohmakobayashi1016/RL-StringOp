@@ -66,12 +66,12 @@ def postprocessing(mesh):
 
 ### parameters ###
 
-input_mesh_refinement = 1  # densify the input 1-face quad mesh
+input_mesh_refinement = 2  # densify the input 1-face quad mesh
 output_mesh_refinement = 1  # densify the ouput quad mesh
 
 # for 'given' production
 add_given_strings = True
-given_strings = ["a", "at", "ata"]
+given_strings = ["atpttpttpttptta"]
 
 class StringVectorConverter:
     def from_string_to_vector(self, string):
@@ -109,14 +109,14 @@ brute_string_length = 8
 add_random_strings = False
 random_string_characters = '01'
 random_string_number = 5
-random_string_length = 20
+random_string_length = 10
 random_string_ratios = [0.5, 0.5]
 
 # for 'structured' construction
 add_structured_strings = False
 structured_string_characters = 'atp'
 structured_string_number = 100
-structured_string_length = 5
+structured_string_length = 8
 
 # random evolution
 add_evolution_strings = False
@@ -124,7 +124,7 @@ evolution_string_characters = '01'
 evolution_string_number = 50
 evolution_string_length = 20
 
-postprocess = False
+postprocess = True
 densify = True
 array = True
 view = True
@@ -173,8 +173,7 @@ if add_evolution_strings:
     strings += list(string_generation_evolution(evolution_string_characters, evolution_string_number, evolution_string_length))
 print('{} strings: {}'.format(len(strings), strings))
 
-strings = ['10', '1000', '10010']
-print(strings)
+
 
 # apply
 t0 = time()
@@ -206,7 +205,7 @@ for k, string in enumerate(strings):
     if export_json:
         HERE = os.path.dirname(__file__)
         FILE = os.path.join(HERE, 'data/{}_{}.json'.format(input_mesh_refinement, string))
-        mesh.to_json('C:/Users/footb/Desktop/Thesis/String-RL/Output/06/{}.json'.format(string))
+        mesh.to_json('C:/Users/footb/Desktop/Thesis/String-RL/Output/meaningful/{}.json'.format(string))
 
     # geometry and density processing
     if postprocess:

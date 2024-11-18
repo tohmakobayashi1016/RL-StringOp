@@ -5,6 +5,8 @@ from compas.geometry import centroid_polygon, area_polygon, length_vector, subtr
 from compas_quad.datastructures import CoarsePseudoQuadMesh
 from compas_viewer.viewer import Viewer
 from compas.colors import Color, ColorDict
+import torch
+import torch.nn.functional as F
 
 
 class MeshFeature:
